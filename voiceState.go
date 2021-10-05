@@ -218,9 +218,8 @@ func (c VoiceChannel) SlackBlocksSingleChannel() ([]json.RawMessage, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "Channel Elements")
 		}
+		blocks = append(blocks, block)
 	}
-
-	blocks = append(blocks, block)
 
 	div, err := DividerBlock()
 	if err != nil {
