@@ -22,6 +22,9 @@ type SlackHandler struct {
 		URI     *regexp.Regexp
 	}
 
+	apiToken   string
+	eventToken string
+
 	workspaceURI string
 }
 
@@ -39,6 +42,9 @@ func NewSlackBot(apiToken, eventToken string) *SlackHandler {
 	slackBot.regExp.UserID = regexp.MustCompile(`<@(\S+)>`)
 	slackBot.regExp.Channel = regexp.MustCompile(`<#(\S+)\|(\S+)>`)
 	slackBot.regExp.URI = regexp.MustCompile(`<(https??://\S+)\|(\S+)>`)
+
+	slackBot.apiToken = apiToken
+	slackBot.eventToken = eventToken
 
 	res, _ := slackBot.api.AuthTest()
 	slackBot.workspaceURI = res.URL
@@ -85,7 +91,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	for _, f := range ev.Files {
 		if f.Filetype == "png" || f.Filetype == "jpg" || f.Filetype == "gif" {
 			req, _ := http.NewRequest("GET", f.URLPrivate, nil)
-			req.Header.Set("Authorization", "Bearer "+Tokens.Slack.API)
+			req.Header.Set("Authorization", "Bearer "+s.apiToken)
 
 			client := new(http.Client)
 			resp, err := client.Do(req)
