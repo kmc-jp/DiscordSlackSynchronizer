@@ -112,7 +112,7 @@ func (v *VoiceChannels) Deafened(userID string) {
 	}
 }
 
-func (v VoiceChannels) SlackBlocks() ([]json.RawMessage, error) {
+func (v VoiceChannels) SlackBlocksMultiChannel() ([]json.RawMessage, error) {
 	blocks := []json.RawMessage{}
 
 	for _, channel := range v.Channels {
@@ -120,7 +120,7 @@ func (v VoiceChannels) SlackBlocks() ([]json.RawMessage, error) {
 			// skip no user channels
 			continue
 		}
-		channelBlocks, err := channel.SlackBlock()
+		channelBlocks, err := channel.SlackBlocksSingleChannel()
 		if err != nil {
 			return nil, errors.Wrapf(err, "Channel Slack Block")
 		}
@@ -140,7 +140,7 @@ func (v VoiceChannels) SlackBlocks() ([]json.RawMessage, error) {
 	return blocks, nil
 }
 
-func (c VoiceChannel) SlackBlock() ([]json.RawMessage, error) {
+func (c VoiceChannel) SlackBlocksSingleChannel() ([]json.RawMessage, error) {
 	var blocks = []json.RawMessage{}
 
 	channelText := fmt.Sprintf("<https://discord.com/channels/%s|%s: >", c.Channel.GuildID, c.Channel.Name)
@@ -213,9 +213,11 @@ func (c VoiceChannel) SlackBlock() ([]json.RawMessage, error) {
 		}
 	}
 
-	block, err = ContextBlock(elements)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Channel Elements")
+	if userCount%4 > 0 {
+		block, err = ContextBlock(elements)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Channel Elements")
+		}
 	}
 
 	blocks = append(blocks, block)

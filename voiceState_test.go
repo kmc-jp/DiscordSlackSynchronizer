@@ -33,7 +33,7 @@ func TestVoiceState(t *testing.T) {
 		t.Fatalf("Expected channelID %s, but got %s", channelID1, channel)
 	}
 
-	block, err := voiceChannels.SlackBlocks()
+	block, err := voiceChannels.SlackBlocksMultiChannel()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestVoiceState(t *testing.T) {
 	if !voiceChannels.Channels[channelID1].Users[memberID1].Muted {
 		t.Fatal("Expected the user is muted")
 	}
-	block, err = voiceChannels.SlackBlocks()
+	block, err = voiceChannels.SlackBlocksMultiChannel()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestVoiceState(t *testing.T) {
 	if !voiceChannels.Channels[channelID1].Users[memberID1].Deafened {
 		t.Fatal("Expected the user is deafened")
 	}
-	block, err = voiceChannels.SlackBlocks()
+	block, err = voiceChannels.SlackBlocksMultiChannel()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestVoiceState(t *testing.T) {
 		t.Fatalf("Expected 0 user in voice channel, But %v",
 			voiceChannels.Channels[channelID1].Users)
 	}
-	block, err = voiceChannels.SlackBlocks()
+	block, err = voiceChannels.SlackBlocksMultiChannel()
 	if err != nil {
 		t.Fatal(err)
 	}

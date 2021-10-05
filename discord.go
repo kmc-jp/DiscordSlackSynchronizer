@@ -209,7 +209,7 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 	var blocks []json.RawMessage
 	var err error
 	if setting.DiscordChannel == "all" {
-		blocks, err = channels.SlackBlocks()
+		blocks, err = channels.SlackBlocksMultiChannel()
 		if err != nil {
 			fmt.Printf("%v\n", errors.Wrapf(err, "Failed SlackBlocks"))
 			return
@@ -219,7 +219,7 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 		if !ok {
 			fmt.Print("Failed to find channel")
 		}
-		blocks, err = channel.SlackBlock()
+		blocks, err = channel.SlackBlocksSingleChannel()
 		if err != nil {
 			fmt.Printf("%v\n", errors.Wrapf(err, "Failed SlackBlock"))
 		}
