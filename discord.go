@@ -153,6 +153,14 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	message.Send()
 }
 
+type VoiceEvent int
+const (
+	VoiceLeft VoiceEvent = iota
+	VoiceEmptied VoiceEvent = iota
+	VoiceStateChanged VoiceEvent = iota
+	VoiceEntered VoiceEvent = iota
+)
+
 func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 	voiceChannels.Mutex.Lock()
 	defer voiceChannels.Mutex.Unlock()
@@ -176,8 +184,11 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 		}
 		channels.Leave(vs.UserID)
 		setting := findSlackChannel(channel, vs.VoiceState.GuildID)
-		d.sendVoiceState(setting, channels)
-
+		if len(channels.Channels[channel].Users) == 0 {
+			d.sendVoiceState(setting, channels, VoiceEmptied)
+		} else {
+			d.sendVoiceState(setting, channels, VoiceLeft)
+		}
 	} else { // User joind or State changed
 		setting := findSlackChannel(vs.VoiceState.ChannelID, vs.VoiceState.GuildID)
 		mem, err := s.GuildMember(vs.GuildID, vs.UserID)
@@ -193,13 +204,15 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 			channels.Muted(vs.UserID)
 		}
 
-		if setting.Setting.SendMuteState || !exists {
-			d.sendVoiceState(setting, channels)
+		if !exists {
+			d.sendVoiceState(setting, channels, VoiceEntered)
+		} else if setting.Setting.SendMuteState {
+			d.sendVoiceState(setting, channels, VoiceStateChanged)
 		}
 	}
 }
 
-func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceChannels) {
+func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceChannels, event VoiceEvent) {
 	if setting.SlackChannel == "" {
 		return
 	}
@@ -229,5 +242,14 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 		Name:    "Discord Watcher",
 		Blocks:  blocks,
 	}
-	message.Send()
+	switch event {
+	case VoiceEntered:
+		slackIndicator.Popup(message)
+	case VoiceLeft:
+		slackIndicator.Update(message)
+	case VoiceStateChanged:
+		slackIndicator.Update(message)
+	case VoiceEmptied:
+		slackIndicator.Remove(message.Channel)
+	}
 }
