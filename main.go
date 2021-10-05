@@ -46,7 +46,14 @@ func main() {
 		return
 	} else {
 		Discord = NewDiscordBot(Tokens.Discord.API)
-		go Discord.Do()
+		go func() {
+			err := Discord.Do()
+			if err != nil {
+				fmt.Println("Error opening Discord session: ", err)
+			}
+			// Wait here until CTRL-C or other term signal is received.
+			fmt.Println("Discord session is now running.  Press CTRL-C to exit.")
+		}()
 	}
 
 	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)

@@ -45,14 +45,8 @@ func (d *DiscordHandler) Close() error {
 	return d.Session.Close()
 }
 
-func (d *DiscordHandler) Do() {
-	// Open the websocket and begin listening.
-	err := d.Session.Open()
-	if err != nil {
-		fmt.Println("Error opening Discord session: ", err)
-	}
-	// Wait here until CTRL-C or other term signal is received.
-	fmt.Println("Discord session is now running.  Press CTRL-C to exit.")
+func (d *DiscordHandler) Do() error {
+	return d.Session.Open()
 }
 
 func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate) {
