@@ -29,6 +29,8 @@ var Slack *SlackHandler
 var Discord *DiscordHandler
 var Gyazo *GyazoHandler
 
+var slackIndicator *SlackIndicator = NewSlackIndicator()
+
 func init() {
 	SettingsFile = filepath.Join("settings", "tokens.json")
 	b, err := ioutil.ReadFile(SettingsFile)
