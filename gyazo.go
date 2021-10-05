@@ -12,7 +12,7 @@ type GyazoHandler struct {
 }
 
 func NewGyazoHandler(token string) (*GyazoHandler, error) {
-	gyazo, err := gyazo.NewClient(Tokens.Gyazo.API)
+	gyazo, err := gyazo.NewClient(token)
 	if err != nil {
 		return nil, err
 	}
