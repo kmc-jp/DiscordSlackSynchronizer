@@ -241,6 +241,7 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 		Channel: setting.SlackChannel,
 		Name:    "Discord Watcher",
 		Blocks:  blocks,
+		IconEmoji: "discord",
 	}
 	switch event {
 	case VoiceEntered:
