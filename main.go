@@ -27,6 +27,7 @@ var SettingsFile string
 
 var Slack *SlackHandler
 var Discord *DiscordHandler
+var Gyazo *GyazoHandler
 
 func init() {
 	SettingsFile = filepath.Join("settings", "tokens.json")
@@ -35,6 +36,10 @@ func init() {
 		panic(err)
 	}
 	err = json.Unmarshal(b, &Tokens)
+	if err != nil {
+		panic(err)
+	}
+	Gyazo, err = NewGyazoHandler(Tokens.Gyazo.API)
 	if err != nil {
 		panic(err)
 	}

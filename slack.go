@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -94,18 +93,13 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 				continue
 			}
 
-			dataBytes, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				continue
-			}
 			defer resp.Body.Close()
-
-			url, err := GyazoFileUpload(dataBytes)
+			image, err := Gyazo.Upload(resp.Body)
 			if err != nil {
 				fileURL = append(fileURL, f.URLPrivate)
 				continue
 			}
-			fileURL = append(fileURL, url+"."+f.Filetype)
+			fileURL = append(fileURL, image.PermalinkURL+"."+f.Filetype)
 		} else {
 			fileURL = append(fileURL, f.URLPrivate)
 		}

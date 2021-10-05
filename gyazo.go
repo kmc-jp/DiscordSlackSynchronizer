@@ -6,16 +6,21 @@ import (
 	"github.com/tomohiro/go-gyazo/gyazo"
 )
 
-//GyazoFileUpload Upload image to Gyazo and return PermalinkURL
-func GyazoFileUpload(dataBytes []byte) (string, error) {
+type GyazoHandler struct {
+	*gyazo.Client
+	token string
+}
+
+func NewGyazoHandler(token string) (*GyazoHandler, error) {
 	gyazo, err := gyazo.NewClient(Tokens.Gyazo.API)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	image, err := gyazo.Upload(bytes.NewReader(dataBytes))
-	if err != nil {
-		return "", err
-	}
-	return image.PermalinkURL, nil
+	return &GyazoHandler{gyazo, token}, nil
+}
+
+//GyazoFileUpload Upload image to Gyazo and return PermalinkURL
+func (g *GyazoHandler) UploadFromBytes(dataBytes []byte) (*gyazo.Image, error) {
+	return g.Upload(bytes.NewReader(dataBytes))
 }
