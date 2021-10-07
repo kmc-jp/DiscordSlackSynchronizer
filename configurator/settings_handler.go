@@ -81,7 +81,7 @@ func (s *SettingsHandler) Start(prefix, sock, addr string) (chan int, error) {
 		w.Write(b)
 	}))
 	mux.Handle(prefix+"/api/", s)
-	mux.Handle(prefix+"/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.Handle(prefix+"/static/", http.StripPrefix(prefix+"/static/", http.FileServer(http.Dir("static"))))
 
 	err = http.Serve(l, mux)
 
