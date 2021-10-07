@@ -62,11 +62,19 @@ func main() {
 
 	go Slack.Do()
 
+	var sockType = os.Getenv("SOCK_TYPE")
+	var listenAddr = os.Getenv("LISTEN_ADDRESS")
+
 	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API, filepath.Join("settings", "settings.json"))
-	if os.Getenv("SOCK_TYPE") != "" {
-		controller, err := conf.Start(os.Getenv("SOCK_TYPE"), os.Getenv("LISTEN_ADDRESS"))
+	if sockType != "" {
+		controller, err := conf.Start(sockType, listenAddr)
 		if err != nil {
 			panic(err)
+		}
+
+		if sockType == "unix" {
+			os.Chmod(listenAddr, 0777)
+			defer os.Remove(listenAddr)
 		}
 
 		go func() {
