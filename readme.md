@@ -121,6 +121,6 @@ all-allは現在1slack-discord関係にしか対応していません。
 追加で起動時に次の環境変数の指定が必要
 
 ```
-SOCK_TYPE=http/unix/指定がなければ無効化
+SOCK_TYPE=tcp/unix/指定がなければ無効化
 LISTEN_ADDRESS=Listen addr
 ```
