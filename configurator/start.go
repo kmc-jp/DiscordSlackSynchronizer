@@ -23,7 +23,7 @@ func New(discord, slack, confPath string) *Handler {
 	return &handler
 }
 
-func (h Handler) Start(sock, addr string) (chan int, error) {
+func (h Handler) Start(prefix, sock, addr string) (chan int, error) {
 	Discord, err := NewDiscordHandler(h.discord.API)
 	if err != nil {
 		return nil, err
@@ -37,5 +37,5 @@ func (h Handler) Start(sock, addr string) (chan int, error) {
 		Slack,
 	)
 
-	return s.Start(sock, addr)
+	return s.Start(prefix, sock, addr)
 }

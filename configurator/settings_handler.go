@@ -55,7 +55,7 @@ func NewSettingsHandler(confPath string, discord *DiscordHandler, slackHandler *
 	}
 }
 
-func (s *SettingsHandler) Start(sock, addr string) (chan int, error) {
+func (s *SettingsHandler) Start(prefix, sock, addr string) (chan int, error) {
 	l, err := net.Listen(sock, addr)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (s *SettingsHandler) Start(sock, addr string) (chan int, error) {
 
 	var mux = http.NewServeMux()
 
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle(prefix+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, err := ioutil.ReadFile("index.html")
 		if err != nil {
 			w.Write([]byte("Error: index.html not found"))
@@ -80,8 +80,8 @@ func (s *SettingsHandler) Start(sock, addr string) (chan int, error) {
 		}
 		w.Write(b)
 	}))
-	mux.Handle("/api/", s)
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.Handle(prefix+"/api/", s)
+	mux.Handle(prefix+"/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	err = http.Serve(l, mux)
 

@@ -67,7 +67,7 @@ func main() {
 
 	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API, filepath.Join("settings", "settings.json"))
 	if sockType != "" {
-		controller, err := conf.Start(sockType, listenAddr)
+		controller, err := conf.Start(os.Getenv("HTTP_PATH_PREFIX"), sockType, listenAddr)
 		if err != nil {
 			panic(err)
 		}
