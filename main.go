@@ -81,6 +81,7 @@ func main() {
 			}
 		}()
 
+		fmt.Printf("Start Configuration Server on: %s\n", os.Getenv("LISTEN_ADDRESS"))
 	}
 
 	sc := make(chan os.Signal, 1)
