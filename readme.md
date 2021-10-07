@@ -3,9 +3,9 @@
 　Slack → Discord，Discord → Slack の同期を行う。
 
 ## 使用方法
-1. settingsディレクトリを作成し、中に
-   `settings.json`
-   を作成
+### SyncDiscordSlack
+#### settings.jsonの追加
+
 ```json
 [
     {
@@ -40,17 +40,51 @@
 - `"discord":"all"`以下の設定は全てのdiscordチャンネルに反映される。
 - その他の個別に指定したチャンネル設定はそちらが優先される。
 
-2. Discordに[アプリを追加](https://discordapp.com/api/oauth2/authorize?client_id=705678824087617578&permissions=33561600&scope=bot)
-   
-- Discordに転送する場合
+#### Discordへアプリ追加
+追加時は、次のスコープが必要
 
-1. Slackの該当チャンネルに@DiscordSyncを招待
+```
+ManageWebhook
+ViewChannels
+UseVoiceActivity
+```
+#### Slackへアプリ追加
+次のスコープが必要
 
-`/invite @DiscordSync`
+```
+channels:history
+channels:read
 
-- Slackに転送する場合
+chat:write
+chat:write.customize
+chat:write.public
 
-該当チャンネルに対し、`"discord2slack": true`を有効にする。簡単。
+files:read
+
+groups:history
+
+groups:read
+
+users.profile:read
+users:read
+```
+
+#### チャンネルの追加
+
+Slackの該当チャンネルルに該当Botを招待
+
+#### 環境変数
+
+さらに、次の環境変数を追加する必要がある。
+
+```
+SLACK_API_TOKEN=xoxb-SlackToken
+SLACK_EVENT_TOKEN=*****
+
+DISCORD_BOT_TOKEN=Discord Bot Token
+
+GYAZO_API_TOKEN=Gyazo API Token
+```
 
 ## Discordの全チャンネルをSlackのそれぞれの同名のチャンネルに共有する
 `CreateSlackChannelOnSend`を有効にすると、Discordの新規チャンネルにより、Slackのチャンネルも作られる。
@@ -81,3 +115,12 @@ all-allは現在1slack-discord関係にしか対応していません。
 - WebhookURLs.jsonの内容はプログラム起動時にキャッシュされるので、設定変更した場合再起動が必要。
 - 複数サーバ／複数チャンネルも対応。
 - Discordに転送しない場合，`slackMap.json`の`"hook"`の記述は不要。
+
+### WebConfigurator
+
+追加で起動時に次の環境変数の指定が必要
+
+```
+SOCK_TYPE=http/unix/指定がなければ無効化
+LISTEN_ADDRESS=Listen addr
+```

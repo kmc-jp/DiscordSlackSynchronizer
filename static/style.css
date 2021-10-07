@@ -1,0 +1,61 @@
+.fill {
+    height: 100%;
+    width: 100%;
+}
+
+#guild_select {
+    width: 30%;
+    display: unset;
+}
+
+#save {
+    float: right;
+}
+
+.viewer.text {
+    line-height: 100%
+}
+
+.viewer.img {
+    transform-origin: center top;
+    transition: all 500ms 0s ease;
+    margin: 0 auto;
+    max-height: 80%;
+    max-width: 100%;
+}
+
+.dropdown.menu {
+    z-index: 3;
+    position: absolute;
+    background-color: white;
+    left: 0px;
+    top: 0px;
+    border: 1px solid silver;
+}
+
+.dropdown.item {
+    cursor: pointer;
+}
+
+.dropdown.item:hover {
+    transition: all 200ms 0s ease;
+    background-color: #d4f0fd;
+}
+
+.dropdown.item td {
+    padding-left: 0.2em;
+    padding-right: 0.2em;
+}
+
+.active {
+    transition: all 200ms 0s ease;
+    color: inherit
+}
+
+.active :active {
+    color: #adadad
+}
+
+.inactive {
+    color: #adadad
+}

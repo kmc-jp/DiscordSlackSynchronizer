@@ -1,16 +1,18 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
+
+	"github.com/bwmarrin/discordgo"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/configurator"
 )
 
-var Tokens struct {
+type Token struct {
 	Slack struct {
 		API   string
 		Event string
@@ -23,6 +25,8 @@ var Tokens struct {
 	}
 }
 
+var Tokens Token
+
 var SettingsFile string
 
 var Slack *SlackHandler
@@ -32,19 +36,10 @@ var Gyazo *GyazoHandler
 var slackIndicator *SlackIndicator = NewSlackIndicator()
 
 func init() {
-	SettingsFile = filepath.Join("settings", "tokens.json")
-	b, err := ioutil.ReadFile(SettingsFile)
-	if err != nil {
-		panic(err)
-	}
-	err = json.Unmarshal(b, &Tokens)
-	if err != nil {
-		panic(err)
-	}
-	Gyazo, err = NewGyazoHandler(Tokens.Gyazo.API)
-	if err != nil {
-		panic(err)
-	}
+	Tokens.Slack.API = os.Getenv("SLACK_API_TOKEN")
+	Tokens.Slack.Event = os.Getenv("SLACK_EVENT_TOKEN")
+	Tokens.Discord.API = os.Getenv("DISCORD_BOT_TOKEN")
+	Tokens.Gyazo.API = os.Getenv("GYAZO_API_TOKEN")
 }
 
 func main() {
@@ -66,6 +61,27 @@ func main() {
 	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)
 
 	go Slack.Do()
+
+	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API, filepath.Join("settings", "settings.json"))
+	if os.Getenv("SOCK_TYPE") != "" {
+		controller, err := conf.Start(os.Getenv("SOCK_TYPE"), os.Getenv("LISTEN_ADDRESS"))
+		if err != nil {
+			panic(err)
+		}
+
+		go func() {
+			for command := range controller {
+				switch command {
+				case configurator.CommandRestart:
+					DiscordWebhook = DiscordWebhookType{
+						webhookByChannelID: map[string]*discordgo.Webhook{},
+						createWebhookLock:  map[string]*sync.RWMutex{},
+					}
+				}
+			}
+		}()
+
+	}
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
