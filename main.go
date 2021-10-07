@@ -72,11 +72,6 @@ func main() {
 			panic(err)
 		}
 
-		if sockType == "unix" {
-			os.Chmod(listenAddr, 0777)
-			defer os.Remove(listenAddr)
-		}
-
 		go func() {
 			for command := range controller {
 				switch command {

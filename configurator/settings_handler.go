@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 )
 
 type SettingsHandler struct {
@@ -58,6 +59,15 @@ func (s *SettingsHandler) Start(sock, addr string) (chan int, error) {
 	l, err := net.Listen(sock, addr)
 	if err != nil {
 		return nil, err
+	}
+
+	if sock == "unix" {
+		err = os.Chmod(addr, 0777)
+		if err != nil {
+			return nil, err
+		}
+
+		defer os.Remove(addr)
 	}
 
 	var mux = http.NewServeMux()
