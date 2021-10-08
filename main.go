@@ -84,6 +84,8 @@ func main() {
 						webhookByChannelID: map[string]*discordgo.Webhook{},
 						createWebhookLock:  map[string]*sync.RWMutex{},
 					}
+				default:
+					continue
 				}
 			}
 		}()
@@ -95,6 +97,6 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
-	// Cleanly close down the Discord session.
 	Discord.Close()
+
 }

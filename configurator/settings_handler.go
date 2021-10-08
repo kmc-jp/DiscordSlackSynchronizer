@@ -3,6 +3,7 @@ package configurator
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -48,10 +49,9 @@ type SendSetting struct {
 
 func NewSettingsHandler(confPath string, discord *DiscordHandler, slackHandler *SlackHandler) *SettingsHandler {
 	return &SettingsHandler{
-		confPath:   confPath,
-		Discord:    discord,
-		Slack:      slackHandler,
-		controller: make(chan int),
+		confPath: confPath,
+		Discord:  discord,
+		Slack:    slackHandler,
 	}
 }
 
@@ -83,7 +83,13 @@ func (s *SettingsHandler) Start(prefix, sock, addr string) (chan int, error) {
 	mux.Handle(prefix+"/api/", s)
 	mux.Handle(prefix+"/static/", http.StripPrefix(prefix+"/static/", http.FileServer(http.Dir("static"))))
 
-	err = http.Serve(l, mux)
+	go func() {
+		var err error
+		err = http.Serve(l, mux)
+		log.Printf("Error: Start http server: %s\n", err.Error())
+	}()
+
+	s.controller = make(chan int)
 
 	return s.controller, err
 }

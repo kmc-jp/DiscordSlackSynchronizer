@@ -134,5 +134,3 @@ LISTEN_ADDRESS=Listen addr
 ```
 STATE_DIRECTORY=/var/lib/...(例)
 ```
-
-
