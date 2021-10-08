@@ -45,5 +45,8 @@ func (h Handler) Start(prefix, sock, addr string) (chan int, error) {
 }
 
 func (h Handler) Close() error {
+	if h.settings == nil {
+		return nil
+	}
 	return h.settings.Close()
 }
