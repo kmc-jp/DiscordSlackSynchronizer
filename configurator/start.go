@@ -12,6 +12,8 @@ type Handler struct {
 		API string
 	}
 	confPath string
+
+	settings *SettingsHandler
 }
 
 func New(discord, slack, confPath string) *Handler {
@@ -37,5 +39,11 @@ func (h Handler) Start(prefix, sock, addr string) (chan int, error) {
 		Slack,
 	)
 
+	h.settings = s
+
 	return s.Start(prefix, sock, addr)
+}
+
+func (h Handler) Close() error {
+	return h.settings.Close()
 }

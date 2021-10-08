@@ -18,6 +18,9 @@ type SettingsHandler struct {
 	controller chan int
 
 	Settings []SlackDiscordTable
+
+	socketType     string
+	socketFileAddr string
 }
 
 //SlackDiscordTable dict of Channel
@@ -66,8 +69,8 @@ func (s *SettingsHandler) Start(prefix, sock, addr string) (chan int, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		defer os.Remove(addr)
+		s.socketFileAddr = addr
+		s.socketType = sock
 	}
 
 	var mux = http.NewServeMux()
@@ -92,6 +95,14 @@ func (s *SettingsHandler) Start(prefix, sock, addr string) (chan int, error) {
 	s.controller = make(chan int)
 
 	return s.controller, err
+}
+
+func (s *SettingsHandler) Close() (err error) {
+	if s.socketType == "unix" {
+		err = os.Remove(s.socketFileAddr)
+	}
+
+	return
 }
 
 func (s *SettingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

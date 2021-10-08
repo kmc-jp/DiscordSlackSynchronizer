@@ -70,7 +70,8 @@ func main() {
 	var listenAddr = os.Getenv("LISTEN_ADDRESS")
 
 	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API, SettingsFile)
-	if sockType != "" {
+	switch sockType {
+	case "tcp", "unix":
 		controller, err := conf.Start(os.Getenv("HTTP_PATH_PREFIX"), sockType, listenAddr)
 		if err != nil {
 			panic(err)
@@ -90,7 +91,7 @@ func main() {
 			}
 		}()
 
-		fmt.Printf("Start Configuration Server on: %s\n", os.Getenv("LISTEN_ADDRESS"))
+		fmt.Printf("Start Configuration Server on: %s:%s\n", sockType, listenAddr)
 	}
 
 	sc := make(chan os.Signal, 1)
@@ -98,5 +99,5 @@ func main() {
 	<-sc
 
 	Discord.Close()
-
+	conf.Close()
 }
