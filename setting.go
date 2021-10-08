@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 )
 
 //SlackDiscordTable dict of Channel
@@ -35,7 +34,7 @@ type SendSetting struct {
 
 func readChannelMap() []SlackDiscordTable {
 	var dict []SlackDiscordTable
-	dataBytes, err := ioutil.ReadFile(filepath.Join("settings", "settings.json"))
+	dataBytes, err := ioutil.ReadFile(SettingsFile)
 	if err != nil {
 		fmt.Printf("%v", err.Error())
 		panic("invalid permission: slackMap.json")

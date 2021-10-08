@@ -6,6 +6,8 @@
 ### SyncDiscordSlack
 #### settings.jsonの追加
 
+バイナリと同階層に次を配置。ただし、後述の環境変数を指定することで設定ファイルを他の場所に配置することも可能。
+
 ```json
 [
     {
@@ -123,4 +125,12 @@ all-allは現在1slack-discord関係にしか対応していません。
 ```
 SOCK_TYPE=tcp/unix/指定がなければ無効化
 LISTEN_ADDRESS=Listen addr
+```
+
+デーモン化するときの都合などで
+`settings.json`
+を移動させなければいけない場合は、次の環境変数で設定が可能
+
+```
+SETTINGS_FILE_PATH=/etc/...(例)
 ```

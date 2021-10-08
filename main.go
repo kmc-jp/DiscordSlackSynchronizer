@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -40,6 +39,10 @@ func init() {
 	Tokens.Slack.Event = os.Getenv("SLACK_EVENT_TOKEN")
 	Tokens.Discord.API = os.Getenv("DISCORD_BOT_TOKEN")
 	Tokens.Gyazo.API = os.Getenv("GYAZO_API_TOKEN")
+	SettingsFile = os.Getenv("SETTINGS_FILE_PATH")
+	if SettingsFile == "" {
+		SettingsFile = "settings.json"
+	}
 }
 
 func main() {
@@ -65,7 +68,7 @@ func main() {
 	var sockType = os.Getenv("SOCK_TYPE")
 	var listenAddr = os.Getenv("LISTEN_ADDRESS")
 
-	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API, filepath.Join("settings", "settings.json"))
+	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API, SettingsFile)
 	if sockType != "" {
 		controller, err := conf.Start(os.Getenv("HTTP_PATH_PREFIX"), sockType, listenAddr)
 		if err != nil {
