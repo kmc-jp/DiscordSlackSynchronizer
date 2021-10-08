@@ -129,8 +129,10 @@ LISTEN_ADDRESS=Listen addr
 
 デーモン化するときの都合などで
 `settings.json`
-を移動させなければいけない場合は、次の環境変数で設定が可能
+を移動させなければいけない場合は、次の環境変数で、設定ファイルのディレクトリを指定することで設定が可能
 
 ```
-SETTINGS_FILE_PATH=/etc/...(例)
+STATE_DIRECTORY=/var/lib/...(例)
 ```
+
+

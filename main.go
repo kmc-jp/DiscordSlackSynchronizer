@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -39,7 +40,7 @@ func init() {
 	Tokens.Slack.Event = os.Getenv("SLACK_EVENT_TOKEN")
 	Tokens.Discord.API = os.Getenv("DISCORD_BOT_TOKEN")
 	Tokens.Gyazo.API = os.Getenv("GYAZO_API_TOKEN")
-	SettingsFile = os.Getenv("SETTINGS_FILE_PATH")
+	SettingsFile = filepath.Join(os.Getenv("STATE_DIRECTORY"), "settings.json")
 	if SettingsFile == "" {
 		SettingsFile = "settings.json"
 	}
