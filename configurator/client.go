@@ -3,14 +3,13 @@ package configurator
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 )
 
 func (s *SettingsHandler) GetClientInfo(w http.ResponseWriter, r *http.Request) {
 	type user struct {
 		UserName string
 	}
-	var resp = user{os.Getenv("REMOTE_USER")}
+	var resp = user{r.Header.Get("X-Forwarded-User")}
 
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
