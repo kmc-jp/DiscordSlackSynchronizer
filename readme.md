@@ -3,8 +3,7 @@
 　Slack → Discord，Discord → Slack の同期を行う。
 
 ## 使用方法
-### SyncDiscordSlack
-#### settings.jsonの追加
+### settings.jsonの追加
 
 バイナリと同階層に次を配置。ただし、後述の環境変数を指定することで設定ファイルを他の場所に配置することも可能。
 
@@ -42,7 +41,7 @@
 - `"discord":"all"`以下の設定は全てのdiscordチャンネルに反映される。
 - その他の個別に指定したチャンネル設定はそちらが優先される。
 
-#### Discordへアプリ追加
+### Discordへアプリ追加
 追加時は、次のスコープが必要
 
 ```
@@ -50,7 +49,7 @@ ManageWebhook
 ViewChannels
 UseVoiceActivity
 ```
-#### Slackへアプリ追加
+### Slackへアプリ追加
 次のスコープが必要
 
 ```
@@ -71,11 +70,11 @@ users.profile:read
 users:read
 ```
 
-#### チャンネルの追加
+### チャンネルの追加
 
 Slackの該当チャンネルルに該当Botを招待
 
-#### 環境変数
+### 環境変数
 
 さらに、次の環境変数を追加する必要がある。
 
