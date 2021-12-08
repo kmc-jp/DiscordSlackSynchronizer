@@ -120,7 +120,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 
 	}
 
-	var text string = s.messageUnescaper.Replace(ev.Text)
+	var text string = ev.Text
 
 	for _, id := range s.regExp.UserID.FindAllStringSubmatch(ev.Text, -1) {
 		if len(id) < 2 {
@@ -150,7 +150,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		)
 	}
 
-	for _, uri := range s.regExp.URI.FindAllStringSubmatch(ev.Text, -1) {
+	for _, uri := range s.regExp.URI.FindAllStringSubmatch(text, -1) {
 		if len(uri) < 3 {
 			continue
 		}
@@ -166,6 +166,8 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 			fmt.Sprintf("%s(URI: <%s>)", uri[2], uri[1]),
 		)
 	}
+
+	text = s.messageUnescaper.Replace(text)
 
 	user, err := s.api.GetUserInfo(ev.User)
 	if err != nil {
