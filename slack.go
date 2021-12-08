@@ -54,7 +54,7 @@ func NewSlackBot(apiToken, eventToken string) *SlackHandler {
 	slackBot.messageUnescaper = strings.NewReplacer(
 		"&amp;", "&",
 		"&lt;", "<",
-		">", "&gt;",
+		"&gt;", ">",
 	)
 
 	return &slackBot
