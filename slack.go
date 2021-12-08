@@ -22,6 +22,8 @@ type SlackHandler struct {
 		URI     *regexp.Regexp
 	}
 
+	messageUnescaper *strings.Replacer
+
 	apiToken   string
 	eventToken string
 
@@ -48,6 +50,12 @@ func NewSlackBot(apiToken, eventToken string) *SlackHandler {
 
 	res, _ := slackBot.api.AuthTest()
 	slackBot.workspaceURI = res.URL
+
+	slackBot.messageUnescaper = strings.NewReplacer(
+		"&amp;", "&",
+		"&lt;", "<",
+		">", "&gt;",
+	)
 
 	return &slackBot
 }
@@ -112,7 +120,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 
 	}
 
-	var text string = ev.Text
+	var text string = s.messageUnescaper.Replace(ev.Text)
 
 	for _, id := range s.regExp.UserID.FindAllStringSubmatch(ev.Text, -1) {
 		if len(id) < 2 {
