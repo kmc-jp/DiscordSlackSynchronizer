@@ -397,45 +397,12 @@ func (d *DiscordReactionHandler) startThread(channelID, messageID string) (chann
 }
 
 func (d *DiscordReactionHandler) getMessages(channelID, timestamp string) (messages []discordgo.Message, err error) {
-	// convert timestamp to message id
-	const DiscordEpoc = 1420070400000
 	if !strings.Contains(timestamp, ".") {
 		return
 	}
 
-	var unixTimeStamp = strings.Split(timestamp, ".")
-
-	var i int
-	var unixSec int64
-	var numChar = len([]rune(unixTimeStamp[0]))
-	for _, nstr := range unixTimeStamp[0] {
-		num, err := strconv.Atoi(string(nstr))
-		if err != nil {
-			return nil, fmt.Errorf("TimeParseError: %s", err.Error())
-		}
-
-		unixSec += int64(float64(num) * math.Pow10(numChar-i-1))
-		i++
-	}
-
-	unixNanoSec, err := strconv.Atoi(unixTimeStamp[0])
-	if err != nil {
-		return
-	}
-
-	var discordTimeStamp = unixSec*1000 + int64(unixNanoSec)/1000 - DiscordEpoc
-
-	var messageIDint64 int64 = discordTimeStamp
-	var messageID string
-
-	messageIDint64 <<= 22
-	messageID = fmt.Sprintf("%v", messageIDint64)
-
-	fmt.Println(messageID)
-
 	var requestAttr = make(url.Values)
 
-	requestAttr.Set("around", messageID)
 	requestAttr.Set("limit", "100")
 
 	var client = http.DefaultClient
@@ -456,13 +423,13 @@ func (d *DiscordReactionHandler) getMessages(channelID, timestamp string) (messa
 	}
 	defer resp.Body.Close()
 
-	fmt.Println(resp.Body)
-
 	var responseAttr []discordgo.Message
 	err = func() error {
 		defer func() {
 			err := recover()
-			log.Println(err)
+			if err != nil {
+				log.Println(err)
+			}
 		}()
 		return json.NewDecoder(resp.Body).Decode(&responseAttr)
 	}()
