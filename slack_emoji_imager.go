@@ -59,8 +59,8 @@ func NewSlackEmojiImager(userToken, botToken string) (*SlackEmojiImager, error) 
 }
 
 func (s *SlackEmojiImager) MakeReactionsImage(channel string, timestamp string) (r io.Reader, err error) {
-	const ReactionEmojiSize = 30
-	const ReactionNumSize = 30
+	const ReactionEmojiSize = 20
+	const ReactionNumSize = 20
 	const ReactionMerginSize = 5
 	const LaneReactionNum = 5
 	const EmojiFilePath = "NotoColorEmoji"

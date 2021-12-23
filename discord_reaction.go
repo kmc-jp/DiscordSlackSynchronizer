@@ -114,11 +114,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 	var message DiscordMessage
 	for i, msg := range messages {
 		if srcContent == msg.Content {
-			if i == 0 {
-				return fmt.Errorf("illigal time")
-			}
-
-			message.Message = &messages[i-1]
+			message.Message = &messages[i]
 			break
 		}
 	}

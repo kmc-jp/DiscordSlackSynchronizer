@@ -273,6 +273,7 @@ func (s *SlackHandler) GetMessage(channelID, timestamp string) (string, error) {
 		ChannelID: channelID,
 		Latest:    timestamp,
 		Limit:     1,
+		Inclusive: true,
 	})
 	if err != nil {
 		return "", err
