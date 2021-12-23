@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	scm "github.com/slack-go/slack/socketmode"
@@ -197,25 +198,31 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		name = user.RealName
 	}
 
-	var message = DiscordHookMessage{
-		Channel: cs.DiscordChannel,
-		Server:  discordID,
-		Name:    name,
-		IconURL: user.Profile.ImageOriginal,
-		Text:    text,
+	var message = DiscordMessage{
+		AvaterURL: user.Profile.ImageOriginal,
+		UserName:  name,
+		Message: &discordgo.Message{
+			GuildID:   discordID,
+			ChannelID: cs.DiscordChannel,
+			Content:   text,
+		},
 	}
 
-	message.Send()
+	// Send by webhook
+	DiscordWebhook.Send(message.ChannelID, message.ID, message, []DiscordFile{})
 
 	for _, f := range fileURL {
-		message = DiscordHookMessage{
-			Channel: cs.DiscordChannel,
-			Server:  discordID,
-			Name:    name,
-			IconURL: user.Profile.ImageOriginal,
-			Text:    f,
+		message = DiscordMessage{
+			AvaterURL: user.Profile.ImageOriginal,
+			UserName:  name,
+			Message: &discordgo.Message{
+				GuildID:   discordID,
+				ChannelID: cs.DiscordChannel,
+				Content:   f,
+			},
 		}
-		message.Send()
+
+		DiscordWebhook.Send(message.ChannelID, message.ID, message, []DiscordFile{})
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -20,6 +21,9 @@ type DiscordHandler struct {
 		UserID   *regexp.Regexp
 		Channel  *regexp.Regexp
 		ImageURI *regexp.Regexp
+
+		replace *regexp.Regexp
+		refURI  *regexp.Regexp
 	}
 }
 
@@ -37,6 +41,8 @@ func NewDiscordBot(apiToken string) *DiscordHandler {
 	d.regExp.UserID = regexp.MustCompile(`<@!(\d+)>`)
 	d.regExp.Channel = regexp.MustCompile(`<#(\d+)>`)
 	d.regExp.ImageURI = regexp.MustCompile(`\S\.png|\.jpg|\.jpeg|\.gif`)
+	d.regExp.replace = regexp.MustCompile(`\s*ss/(.+)/(.*)\s*`)
+	d.regExp.refURI = regexp.MustCompile(`\(RefURI:\s<https:.+>\)`)
 
 	dg.AddHandler(d.voiceState)
 	dg.AddHandler(d.watch)
@@ -59,6 +65,83 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		return
 	}
 
+	var reference *discordgo.Message
+	var err error
+
+	if m.Message != nil && m.Message.MessageReference != nil {
+		reference, err = s.ChannelMessage(m.Message.MessageReference.ChannelID, m.Message.MessageReference.MessageID)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		if d.regExp.replace.MatchString(m.Content) {
+			err := d.deleteMessage(m.ChannelID, m.ID)
+			if err != nil {
+				log.Println(err)
+			}
+
+			var message DiscordMessage
+			message.Message = reference
+			message.Attachments = make([]DiscordAttachment, 0)
+
+			for i := range message.Message.Attachments {
+				if message.Message.Attachments[i] == nil {
+					continue
+				}
+
+				var oldAtt = message.Message.Attachments[i]
+
+				id, err := strconv.Atoi(oldAtt.ID)
+				if err != nil {
+					continue
+				}
+
+				message.Attachments = append(message.Attachments, DiscordAttachment{
+					URL:      oldAtt.URL,
+					ID:       id,
+					ProxyURL: oldAtt.ProxyURL,
+					Filename: oldAtt.Filename,
+					Width:    oldAtt.Width,
+					Height:   oldAtt.Height,
+					Size:     oldAtt.Size,
+				})
+			}
+
+			var newContent = reference.Content
+			var newContentSlice = strings.Split(newContent, "\n")
+
+			var refMatch = d.regExp.refURI.MatchString(newContentSlice[len(newContentSlice)-1])
+			if refMatch {
+				newContent = strings.Join(newContentSlice[1:len(newContentSlice)-1], "\n")
+			}
+
+			// replace and fix message
+			var matches = d.regExp.replace.FindAllStringSubmatch(m.Content, -1)
+			for _, match := range matches {
+				newContent = strings.ReplaceAll(newContent, match[1], match[2])
+			}
+
+			if refMatch {
+				newContent = strings.Join(
+					[]string{
+						newContentSlice[0],
+						newContent,
+						newContentSlice[len(newContentSlice)-1],
+					}, "\n",
+				)
+			}
+
+			message.Content = newContent
+			err = DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
+			if err != nil {
+				return
+			}
+
+			return
+		}
+	}
+
 	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
 	if sdt.SlackChannel == "" {
 		return
@@ -70,7 +153,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	}
 
 	// Delete message on Discord
-	err := d.deleteMessage(m.ChannelID, m.ID)
+	err = d.deleteMessage(m.ChannelID, m.ID)
 	if err != nil {
 		log.Println(err)
 	}
@@ -80,15 +163,34 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		name = m.Author.Username
 	}
 
-	var discordMessage = DiscordHookMessage{
-		Channel: m.ChannelID,
-		Name:    name,
-		Text:    m.Content,
-		IconURL: m.Author.AvatarURL(""),
+	var dMessage = DiscordMessage{
+		AvaterURL: m.Author.AvatarURL(""),
+		UserName:  name,
+		Message: &discordgo.Message{
+			ChannelID: m.ChannelID,
+			Content:   m.Content,
+		},
+	}
+
+	if reference != nil {
+		var refText string
+		var refSlice = strings.Split(reference.Content, "\n")
+		if len(refSlice) > 1 {
+			refText = refSlice[0] + "..."
+		} else {
+			refText = refSlice[0]
+		}
+		dMessage.Content = fmt.Sprintf("> %s\n%s\n(RefURI: <%s>)",
+			refText,
+			m.Content,
+			fmt.Sprintf("https://discord.com/channels/%s/%s/%s",
+				m.GuildID, reference.ChannelID, reference.ID,
+			),
+		)
 	}
 
 	// Send by webhook
-	discordMessage.Send()
+	DiscordWebhook.Send(m.ChannelID, m.ID, dMessage, []DiscordFile{})
 
 	var imageURIs = []string{}
 	var fileURL string
@@ -100,9 +202,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		}
 	}
 
-	var content string
-
-	content = m.Content
+	var content = dMessage.Content
 
 	for _, id := range d.regExp.UserID.FindAllStringSubmatch(content, -1) {
 		if len(id) < 2 {

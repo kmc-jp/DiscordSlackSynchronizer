@@ -1,14 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
-	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -35,7 +33,33 @@ type ReactionImagerType interface {
 
 type DiscordMessage struct {
 	*discordgo.Message
+	Components  []DiscordComponent  `json:"components,omitempty"`
+	AvaterURL   string              `json:"avatar_url,omitempty"`
 	Attachments []DiscordAttachment `json:"attachments"`
+	UserName    string              `json:"username,omitempty"`
+}
+
+type DiscordComponent struct {
+	Type        int                `json:"type"`
+	CustomID    string             `json:"custom_id,omitempty"`
+	Disabled    bool               `json:"disabled,omitempty"`
+	Style       int                `json:"style,omitempty"`
+	Label       string             `json:"label,omitempty"`
+	URL         string             `json:"url,omitempty"`
+	Placeholder string             `json:"placeholder,omitempty"`
+	MinValues   int                `json:"min_values,omitempty"`
+	MaxValues   int                `json:"max_values,omitempty"`
+	Components  []DiscordComponent `json:"components,omitempty"`
+	Emoji       *discordgo.Emoji   `json:"emoji,omitempty"`
+	Options     []DiscordOption    `json:"options,omitempty"`
+}
+
+type DiscordOption struct {
+	Label       string           `json:"label"`
+	Value       string           `json:"value"`
+	Description string           `json:"description,omitempty"`
+	Emoji       *discordgo.Emoji `json:"emoji,omitempty"`
+	Default     bool             `json:"default,omitempty"`
 }
 
 type DiscordAttachment struct {
@@ -152,7 +176,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 	}
 
 	if zeroReaction {
-		return d.editMessage(message.ChannelID, message.ID, message, []DiscordFile{})
+		return DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
 	}
 
 	var file = DiscordFile{
@@ -161,98 +185,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 		ContentType: "image/gif",
 	}
 
-	return d.editMessage(message.ChannelID, message.ID, message, []DiscordFile{file})
-}
-
-func (d *DiscordReactionHandler) deleteMessage(channelID, messageID string) (err error) {
-	var requestAttr = make(url.Values)
-
-	requestAttr.Set("name", DiscordReactionThreadName)
-	requestAttr.Set("auto_archive_duration", "10")
-
-	var client = http.DefaultClient
-	req, err := http.NewRequest(
-		"POST",
-		fmt.Sprintf("%s/channels/%s/messages/%s",
-			DiscordAPIEndpoint, channelID, messageID,
-		),
-		nil,
-	)
-	if err != nil {
-		return
-	}
-
-	req.Header.Set("Authorization", "Bot "+d.token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	return nil
-}
-
-func (d *DiscordReactionHandler) editMessage(channelID, messageID string, message DiscordMessage, files []DiscordFile) (err error) {
-	var hook = DiscordWebhook.Get(channelID)
-
-	if err != nil {
-		return
-	}
-
-	var body = new(bytes.Buffer)
-
-	var mw = multipart.NewWriter(body)
-
-	var mh = make(textproto.MIMEHeader)
-	mh.Set("Content-Type", "application/json")
-	mh.Set(`Content-Disposition`, `form-data; name="payload_json"`)
-
-	pw, err := mw.CreatePart(mh)
-	if err != nil {
-		return err
-	}
-
-	b, err := json.MarshalIndent(message, "", "    ")
-
-	var jsonBuf = bytes.NewBuffer(b)
-	io.Copy(pw, jsonBuf)
-
-	for i, file := range files {
-		var mh = make(textproto.MIMEHeader)
-		mh.Set("Content-Type", file.ContentType)
-		mh.Set(`Content-Disposition`, fmt.Sprintf(`form-data; name="files[%d]"; filename="%s"`, i, file.FileName))
-
-		pw, err := mw.CreatePart(mh)
-		if err != nil {
-			return err
-		}
-
-		io.Copy(pw, file.Reader)
-	}
-
-	mw.Close()
-
-	req, err := http.NewRequest(
-		"PATCH",
-		fmt.Sprintf("%s/webhooks/%s/%s/messages/%s",
-			DiscordAPIEndpoint, hook.ID, hook.Token, messageID,
-		),
-		body,
-	)
-	if err != nil {
-		return
-	}
-
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	return
+	return DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{file})
 }
 
 func (d *DiscordReactionHandler) writePartValue(mw *multipart.Writer, name, value string) error {
@@ -264,119 +197,6 @@ func (d *DiscordReactionHandler) writePartValue(mw *multipart.Writer, name, valu
 	pw.Write([]byte(value))
 
 	return nil
-}
-
-func (d *DiscordReactionHandler) createMessage(channelID, content string) (Err error) {
-	var requestAttr = make(url.Values)
-
-	requestAttr.Set("name", DiscordReactionThreadName)
-	requestAttr.Set("auto_archive_duration", "10")
-
-	var client = http.DefaultClient
-	req, err := http.NewRequest(
-		"POST",
-		fmt.Sprintf("%s/channels/%s/messages",
-			DiscordAPIEndpoint, channelID,
-		),
-		nil,
-	)
-	if err != nil {
-		return
-	}
-
-	req.Header.Set("Authorization", "Bot "+d.token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	var responseAttr []discordgo.Channel
-	err = json.NewDecoder(resp.Body).Decode(&responseAttr)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (d *DiscordReactionHandler) findOwnThread(guildID, channelID string) (channels []discordgo.Channel, err error) {
-	var client = http.DefaultClient
-	req, err := http.NewRequest(
-		"POST",
-		fmt.Sprintf("%s/guilds/%s/threads/active",
-			DiscordAPIEndpoint, channelID,
-		),
-		nil,
-	)
-	if err != nil {
-		return
-	}
-
-	req.Header.Set("Authorization", "Bot "+d.token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	type responseAttrType struct {
-		Threads []discordgo.Channel `json:"threads"`
-		Members []discordgo.Member  `json:"members"`
-	}
-
-	var responseAttr responseAttrType
-	err = json.NewDecoder(resp.Body).Decode(&responseAttr)
-	if err != nil {
-		return
-	}
-
-	channels = make([]discordgo.Channel, 0)
-
-	for _, ch := range responseAttr.Threads {
-		if ch.ID == channelID {
-			channels = append(channels, ch)
-		}
-	}
-
-	return channels, nil
-}
-
-func (d *DiscordReactionHandler) startThread(channelID, messageID string) (channel discordgo.Channel, err error) {
-	var requestAttr = make(url.Values)
-
-	requestAttr.Set("name", DiscordReactionThreadName)
-	requestAttr.Set("auto_archive_duration", "10")
-
-	var client = http.DefaultClient
-	req, err := http.NewRequest(
-		"POST",
-		fmt.Sprintf("%s/channels/%s/messages/%s/threads?%s",
-			DiscordAPIEndpoint, channelID, messageID, requestAttr.Encode(),
-		),
-		nil,
-	)
-	if err != nil {
-		return
-	}
-
-	req.Header.Set("Authorization", "Bot "+d.token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	var responseAttr []discordgo.Channel
-	err = json.NewDecoder(resp.Body).Decode(&responseAttr)
-	if err != nil {
-		return
-	}
-
-	return channel, nil
 }
 
 func (d *DiscordReactionHandler) getMessages(channelID, timestamp string) (messages []discordgo.Message, err error) {

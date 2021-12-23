@@ -1,7 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/textproto"
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
@@ -9,6 +15,7 @@ import (
 
 //DiscordHookMessage DiscordにIncommingWebhook経由のMessage送信形式
 type DiscordHookMessage struct {
+	*discordgo.Message
 	Channel string `json:"channel_id"`
 	Server  string `json:"guild_id"`
 	Name    string `json:"username"`
@@ -63,26 +70,89 @@ func (d *DiscordWebhookType) Get(channelID string) *discordgo.Webhook {
 	return webhook
 }
 
-//Send json形式で指定したURLにPOSTする。
-func (h *DiscordHookMessage) Send() {
-	if h.Channel == "" {
-		fmt.Printf("Faild discord send because h.Channel is empty: %+v\n", h)
-		return
-	}
-	webhook := DiscordWebhook.Get(h.Channel)
-	if webhook == nil {
-		fmt.Printf("Faild get webhook\n")
+func (d *DiscordWebhookType) send(method, channelID, messageID string, message DiscordMessage, files []DiscordFile) (err error) {
+	var hook = d.Get(channelID)
+
+	if err != nil {
 		return
 	}
 
-	data := &discordgo.WebhookParams{
-		Content:   h.Text,
-		Username:  h.Name,
-		AvatarURL: h.IconURL,
-	}
-	_, err := Discord.Session.WebhookExecute(webhook.ID, webhook.Token, false, data)
+	var body = new(bytes.Buffer)
+
+	var mw = multipart.NewWriter(body)
+
+	var mh = make(textproto.MIMEHeader)
+	mh.Set("Content-Type", "application/json")
+	mh.Set(`Content-Disposition`, `form-data; name="payload_json"`)
+
+	pw, err := mw.CreatePart(mh)
 	if err != nil {
-		fmt.Printf("MessageSendError(Discord):\n   %s\n", err.Error())
+		return err
+	}
+
+	b, err := json.MarshalIndent(message, "", "    ")
+
+	var jsonBuf = bytes.NewBuffer(b)
+	io.Copy(pw, jsonBuf)
+
+	for i, file := range files {
+		var mh = make(textproto.MIMEHeader)
+		mh.Set("Content-Type", file.ContentType)
+		mh.Set(`Content-Disposition`, fmt.Sprintf(`form-data; name="files[%d]"; filename="%s"`, i, file.FileName))
+
+		pw, err := mw.CreatePart(mh)
+		if err != nil {
+			return err
+		}
+
+		io.Copy(pw, file.Reader)
+	}
+
+	mw.Close()
+
+	var req *http.Request
+	switch method {
+	case "EDIT":
+		req, err = http.NewRequest(
+			"PATCH",
+			fmt.Sprintf("%s/webhooks/%s/%s/messages/%s",
+				DiscordAPIEndpoint, hook.ID, hook.Token, messageID,
+			),
+			body,
+		)
+	case "SEND":
+		req, err = http.NewRequest(
+			"POST",
+			fmt.Sprintf("%s/webhooks/%s/%s",
+				DiscordAPIEndpoint, hook.ID, hook.Token,
+			),
+			body,
+		)
+	}
+
+	if err != nil {
 		return
 	}
+
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	var buf = new(bytes.Buffer)
+	io.Copy(buf, resp.Body)
+	fmt.Println(buf.String())
+
+	return
+}
+
+func (d *DiscordWebhookType) Edit(channelID, messageID string, message DiscordMessage, files []DiscordFile) (err error) {
+	return DiscordWebhook.send("EDIT", channelID, messageID, message, files)
+}
+
+func (d *DiscordWebhookType) Send(channelID, messageID string, message DiscordMessage, files []DiscordFile) (err error) {
+	return DiscordWebhook.send("SEND", channelID, messageID, message, files)
 }
