@@ -60,30 +60,32 @@ func main() {
 	}
 
 	var discordReactionHandler = NewDiscordReactionHandler(Tokens.Discord.API, Gyazo)
-	discordReactionHandler.AddReactionImager(imager)
+	discordReactionHandler.SetReactionImager(imager)
 
 	if Tokens.Discord.API == "" {
 		fmt.Println("No discord token provided")
 		return
-	} else {
-		Discord = NewDiscordBot(Tokens.Discord.API)
-		go func() {
-			err := Discord.Do()
-			if err != nil {
-				fmt.Println("Error opening Discord session: ", err)
-			}
-
-			// Wait here until CTRL-C or other term signal is received.
-			fmt.Println("Discord session is now running.  Press CTRL-C to exit.")
-		}()
 	}
+
+	Discord = NewDiscordBot(Tokens.Discord.API)
+	go func() {
+		err := Discord.Do()
+		if err != nil {
+			fmt.Println("Error opening Discord session: ", err)
+		}
+
+		// Wait here until CTRL-C or other term signal is received.
+		fmt.Println("Discord session is now running.  Press CTRL-C to exit.")
+	}()
 
 	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)
 	Slack.SetGyazoHandler(Gyazo)
+	Slack.SetReactionHandler(discordReactionHandler)
 
 	go Slack.Do()
 
-	Slack.AddReactionHandler(discordReactionHandler)
+	discordReactionHandler.SetMessageGetter(Slack)
+	discordReactionHandler.SetMessageEscaper(Slack)
 
 	var sockType = os.Getenv("SOCK_TYPE")
 	var listenAddr = os.Getenv("LISTEN_ADDRESS")

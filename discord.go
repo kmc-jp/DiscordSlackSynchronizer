@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -22,7 +24,6 @@ type DiscordHandler struct {
 }
 
 func NewDiscordBot(apiToken string) *DiscordHandler {
-
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + Tokens.Discord.API)
 	if err != nil {
@@ -58,6 +59,27 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		return
 	}
 
+	// Delete message on Discord
+	err := d.deleteMessage(m.ChannelID, m.ID)
+	if err != nil {
+		log.Println(err)
+	}
+
+	var name string = m.Member.Nick
+	if name == "" {
+		name = m.Author.Username
+	}
+
+	var discordMessage = DiscordHookMessage{
+		Channel: m.ChannelID,
+		Name:    name,
+		Text:    m.Content,
+		IconURL: m.Author.AvatarURL(""),
+	}
+
+	// Send by webhook
+	discordMessage.Send()
+
 	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
 	if sdt.SlackChannel == "" {
 		return
@@ -76,11 +98,6 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		} else {
 			fileURL += "\n" + f.URL
 		}
-	}
-
-	var name string = m.Member.Nick
-	if name == "" {
-		name = m.Author.Username
 	}
 
 	var content string
@@ -152,6 +169,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		Attachments: attachments,
 	}
 
+	// Send message to Slack
 	message.Send()
 }
 
@@ -256,4 +274,27 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 	case VoiceEmptied:
 		slackIndicator.Remove(message.Channel)
 	}
+}
+
+func (d *DiscordHandler) deleteMessage(channelID, messageID string) (err error) {
+	req, err := http.NewRequest(
+		"DELETE",
+		fmt.Sprintf("%s/channels/%s/messages/%s",
+			DiscordAPIEndpoint, channelID, messageID,
+		),
+		nil,
+	)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Authorization", d.Session.Token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	return nil
 }

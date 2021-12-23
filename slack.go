@@ -112,7 +112,7 @@ func (s *SlackHandler) SetGyazoHandler(g *GyazoHandler) {
 	s.gyazo = g
 }
 
-func (s *SlackHandler) AddReactionHandler(handler ReactionHandler) {
+func (s *SlackHandler) SetReactionHandler(handler ReactionHandler) {
 	s.reactionHandler = handler
 }
 
@@ -181,54 +181,11 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 
 		}
 	}
-	var text string = ev.Text
 
-	for _, id := range s.regExp.UserID.FindAllStringSubmatch(ev.Text, -1) {
-		if len(id) < 2 {
-			continue
-		}
-
-		u, err := s.api.GetUserInfo(id[1])
-		if err != nil {
-			return
-		}
-
-		var repl = u.Profile.DisplayName
-		if repl == "" {
-			repl = u.RealName
-		}
-		text = strings.Join(strings.Split(text, id[0]), "`@"+repl+"`")
+	text, err := s.EscapeMessage(ev.Text)
+	if err != nil {
+		return
 	}
-
-	for _, ch := range s.regExp.Channel.FindAllStringSubmatch(ev.Text, -1) {
-		if len(ch) < 3 {
-			continue
-		}
-
-		text = strings.Join(strings.Split(text,
-			fmt.Sprintf("<#%s|%s>", ch[1], ch[2])),
-			fmt.Sprintf("`#%s`(URI: <%sarchives/%s>)", ch[2], s.workspaceURI, ch[1]),
-		)
-	}
-
-	for _, uri := range s.regExp.URI.FindAllStringSubmatch(text, -1) {
-		if len(uri) < 3 {
-			continue
-		}
-
-		if uri[1] == uri[2] {
-			text = strings.Join(strings.Split(text,
-				fmt.Sprintf("<%s|%s>", uri[1], uri[2])),
-				fmt.Sprintf("<%s>)", uri[1]),
-			)
-		}
-		text = strings.Join(strings.Split(text,
-			fmt.Sprintf("<%s|%s>", uri[1], uri[2])),
-			fmt.Sprintf("%s(URI: <%s>)", uri[2], uri[1]),
-		)
-	}
-
-	text = s.messageUnescaper.Replace(text)
 
 	user, err := s.api.GetUserInfo(ev.User)
 	if err != nil {
@@ -260,4 +217,66 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		}
 		message.Send()
 	}
+}
+
+func (s *SlackHandler) EscapeMessage(content string) (output string, err error) {
+	for _, id := range s.regExp.UserID.FindAllStringSubmatch(content, -1) {
+		if len(id) < 2 {
+			continue
+		}
+
+		u, err := s.api.GetUserInfo(id[1])
+		if err != nil {
+			return "", err
+		}
+
+		var repl = u.Profile.DisplayName
+		if repl == "" {
+			repl = u.RealName
+		}
+		content = strings.Join(strings.Split(content, id[0]), "`@"+repl+"`")
+	}
+
+	for _, ch := range s.regExp.Channel.FindAllStringSubmatch(content, -1) {
+		if len(ch) < 3 {
+			continue
+		}
+
+		content = strings.Join(strings.Split(content,
+			fmt.Sprintf("<#%s|%s>", ch[1], ch[2])),
+			fmt.Sprintf("`#%s`(URI: <%sarchives/%s>)", ch[2], s.workspaceURI, ch[1]),
+		)
+	}
+
+	for _, uri := range s.regExp.URI.FindAllStringSubmatch(content, -1) {
+		if len(uri) < 3 {
+			continue
+		}
+
+		if uri[1] == uri[2] {
+			content = strings.Join(strings.Split(content,
+				fmt.Sprintf("<%s|%s>", uri[1], uri[2])),
+				fmt.Sprintf("<%s>)", uri[1]),
+			)
+		}
+		content = strings.Join(strings.Split(content,
+			fmt.Sprintf("<%s|%s>", uri[1], uri[2])),
+			fmt.Sprintf("%s(URI: <%s>)", uri[2], uri[1]),
+		)
+	}
+
+	return s.messageUnescaper.Replace(content), nil
+}
+
+func (s *SlackHandler) GetMessage(channelID, timestamp string) (string, error) {
+	res, err := s.api.GetConversationHistory(&slack.GetConversationHistoryParameters{
+		ChannelID: channelID,
+		Latest:    timestamp,
+		Limit:     1,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return res.Messages[0].Text, nil
 }
