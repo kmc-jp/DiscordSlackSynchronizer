@@ -142,3 +142,5 @@ STATE_DIRECTORY=/var/lib/...(例)
 
 Google Inc.
 Arjen Nienhuis <a.g.nienhuis@gmail.com>
+
+[LISENCE](noto-emoji_LISENCE)
