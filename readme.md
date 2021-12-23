@@ -46,7 +46,8 @@
 
 ```
 ManageWebhook
-ViewChannels
+ReadMessages/ViewChannels
+Read Message History
 UseVoiceActivity
 ```
 ### Slackへアプリ追加
