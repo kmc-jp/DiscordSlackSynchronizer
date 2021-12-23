@@ -16,6 +16,7 @@ type Token struct {
 	Slack struct {
 		API   string
 		Event string
+		User  string
 	}
 	Discord struct {
 		API string
@@ -40,6 +41,7 @@ func init() {
 	Tokens.Slack.Event = os.Getenv("SLACK_EVENT_TOKEN")
 	Tokens.Discord.API = os.Getenv("DISCORD_BOT_TOKEN")
 	Tokens.Gyazo.API = os.Getenv("GYAZO_API_TOKEN")
+	Tokens.Slack.User = os.Getenv("SLACK_API_USER_TOKEN")
 	SettingsFile = filepath.Join(os.Getenv("STATE_DIRECTORY"), "settings.json")
 	if SettingsFile == "" {
 		SettingsFile = "settings.json"
@@ -47,8 +49,21 @@ func init() {
 }
 
 func main() {
+	Gyazo, err := NewGyazoHandler(Tokens.Gyazo.API)
+	if err != nil {
+		fmt.Println("Gyazo initialize error:", err)
+	}
+
+	imager, err := NewSlackEmojiImager(Tokens.Slack.User, Tokens.Slack.API)
+	if err != nil {
+		fmt.Println("Imager initialize error:", err)
+	}
+
+	var discordReactionHandler = NewDiscordReactionHandler(Tokens.Discord.API, Gyazo)
+	discordReactionHandler.AddReactionImager(imager)
+
 	if Tokens.Discord.API == "" {
-		fmt.Println("No discord token provided. Please run: airhorn -t <bot token>")
+		fmt.Println("No discord token provided")
 		return
 	} else {
 		Discord = NewDiscordBot(Tokens.Discord.API)
@@ -57,14 +72,18 @@ func main() {
 			if err != nil {
 				fmt.Println("Error opening Discord session: ", err)
 			}
+
 			// Wait here until CTRL-C or other term signal is received.
 			fmt.Println("Discord session is now running.  Press CTRL-C to exit.")
 		}()
 	}
 
 	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)
+	Slack.SetGyazoHandler(Gyazo)
 
 	go Slack.Do()
+
+	Slack.AddReactionHandler(discordReactionHandler)
 
 	var sockType = os.Getenv("SOCK_TYPE")
 	var listenAddr = os.Getenv("LISTEN_ADDRESS")

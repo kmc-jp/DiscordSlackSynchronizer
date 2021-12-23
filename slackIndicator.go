@@ -16,9 +16,6 @@ func NewSlackIndicator() *SlackIndicator {
 	return &SlackIndicator{LastMessages: map[string]string{}}
 }
 
-var SlackChatUpdateURL = "https://slack.com/api/chat.update"
-var SlackChatDeleteURL = "https://slack.com/api/chat.delete"
-
 func (s *SlackIndicator) Popup(block SlackHookBlock) error {
 	_, ok := s.LastMessages[block.Channel]
 	if ok {
@@ -45,7 +42,7 @@ func (s *SlackIndicator) Popup(block SlackHookBlock) error {
 		return fmt.Errorf("failed send slack: body: %s", body)
 	}
 	var r struct {
-		OK bool `json:"ok"`
+		OK bool   `json:"ok"`
 		TS string `json:"ts"`
 	}
 	err = json.Unmarshal(body, &r)
@@ -69,14 +66,14 @@ func (s *SlackIndicator) Update(block SlackHookBlock) error {
 		TS string `json:"ts"`
 		SlackHookBlock
 	}
-	updateBlock := &UpdateBlock {
-		TS: ts,
+	updateBlock := &UpdateBlock{
+		TS:             ts,
 		SlackHookBlock: block,
 	}
 
 	jsondataBytes, _ := json.Marshal(updateBlock)
 
-	req, _ := http.NewRequest("POST", SlackChatUpdateURL, bytes.NewBuffer(jsondataBytes))
+	req, _ := http.NewRequest("POST", SlackAPIEndpoint+"/chat.update", bytes.NewBuffer(jsondataBytes))
 	req.Header.Set("Authorization", "Bearer "+Tokens.Slack.API)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -94,7 +91,7 @@ func (s *SlackIndicator) Update(block SlackHookBlock) error {
 		return fmt.Errorf("failed send slack: body: %s", body)
 	}
 	var r struct {
-		OK bool `json:"ok"`
+		OK bool   `json:"ok"`
 		TS string `json:"ts"`
 	}
 	err = json.Unmarshal(body, &r)
@@ -116,15 +113,15 @@ func (s *SlackIndicator) Remove(channelID string) error {
 
 	type RemoveMessage struct {
 		Channel string `json:"channel"`
-		TS string `json:"ts"`
+		TS      string `json:"ts"`
 	}
-	removeMessage := &RemoveMessage {
+	removeMessage := &RemoveMessage{
 		Channel: channelID,
-		TS: ts,
+		TS:      ts,
 	}
 	jsondataBytes, _ := json.Marshal(removeMessage)
 
-	req, _ := http.NewRequest("POST", SlackChatDeleteURL, bytes.NewBuffer(jsondataBytes))
+	req, _ := http.NewRequest("POST", SlackAPIEndpoint+"/chat.delete", bytes.NewBuffer(jsondataBytes))
 	req.Header.Set("Authorization", "Bearer "+Tokens.Slack.API)
 	req.Header.Set("Content-Type", "application/json")
 

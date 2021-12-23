@@ -13,6 +13,8 @@ import (
 	scm "github.com/slack-go/slack/socketmode"
 )
 
+const SlackAPIEndpoint = "https://slack.com/api"
+
 type SlackHandler struct {
 	api    *slack.Client
 	scm    *scm.Client
@@ -22,12 +24,16 @@ type SlackHandler struct {
 		URI     *regexp.Regexp
 	}
 
+	gyazo *GyazoHandler
+
 	messageUnescaper *strings.Replacer
 
 	apiToken   string
 	eventToken string
 
 	workspaceURI string
+
+	reactionHandler ReactionHandler
 }
 
 func NewSlackBot(apiToken, eventToken string) *SlackHandler {
@@ -75,18 +81,66 @@ func (s *SlackHandler) Do() {
 		case scm.EventTypeEventsAPI:
 			s.scm.Ack(*ev.Request)
 
-			evp, _ := ev.Data.(slackevents.EventsAPIEvent)
+			evp, ok := ev.Data.(slackevents.EventsAPIEvent)
+			if !ok {
+				continue
+			}
 			switch evp.Type {
 			case slackevents.CallbackEvent:
 				switch evi := evp.InnerEvent.Data.(type) {
 				case *slackevents.AppMentionEvent:
 				case *slackevents.MessageEvent:
 					s.messageHandle(evi)
+				case *slackevents.EmojiChangedEvent:
+					s.emojiChangeHandle(evi)
+				case *slackevents.ReactionAddedEvent:
+					if evi.Item.Type == "message" {
+						s.reactionHandle(evi.Item.Channel, evi.Item.Timestamp)
+					}
+				case *slackevents.ReactionRemovedEvent:
+					if evi.Item.Type == "message" {
+						s.reactionHandle(evi.Item.Channel, evi.Item.Timestamp)
+					}
 				}
 			}
+
 		}
 	}
+}
 
+func (s *SlackHandler) SetGyazoHandler(g *GyazoHandler) {
+	s.gyazo = g
+}
+
+func (s *SlackHandler) AddReactionHandler(handler ReactionHandler) {
+	s.reactionHandler = handler
+}
+
+func (s *SlackHandler) reactionHandle(channel string, timestamp string) {
+	if s.reactionHandler != nil {
+		err := s.reactionHandler.GetReaction(channel, timestamp)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
+func (s *SlackHandler) emojiChangeHandle(ev *slackevents.EmojiChangedEvent) {
+	switch ev.Subtype {
+	case "add":
+		var uri = ev.Value
+		if strings.HasPrefix(ev.Value, "alias:") {
+			uri = s.reactionHandler.GetEmojiURI(strings.TrimPrefix(uri, "alias:"))
+		}
+		s.reactionHandler.AddEmoji(ev.Name, uri)
+	case "remove":
+		for _, name := range ev.Names {
+			s.reactionHandler.RemoveEmoji(name)
+		}
+	case "rename":
+		s.reactionHandler.RemoveEmoji(ev.OldName)
+		s.reactionHandler.AddEmoji(ev.NewName, ev.Value)
+	}
 }
 
 func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
@@ -95,31 +149,38 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	if !cs.Setting.SlackToDiscord {
 		return
 	}
+
 	var fileURL []string
-	for _, f := range ev.Files {
-		if f.Filetype == "png" || f.Filetype == "jpg" || f.Filetype == "gif" {
-			req, _ := http.NewRequest("GET", f.URLPrivate, nil)
-			req.Header.Set("Authorization", "Bearer "+s.apiToken)
 
-			client := new(http.Client)
-			resp, err := client.Do(req)
-			if err != nil {
-				continue
-			}
+	if s.gyazo != nil {
+		for _, f := range ev.Files {
+			if f.Filetype == "png" || f.Filetype == "jpg" || f.Filetype == "gif" {
+				req, err := http.NewRequest("GET", f.URLPrivate, nil)
 
-			defer resp.Body.Close()
-			image, err := Gyazo.Upload(resp.Body)
-			if err != nil {
+				req.Header.Set("Authorization", "Bearer "+s.apiToken)
+				if err != nil {
+					continue
+				}
+
+				client := new(http.Client)
+				resp, err := client.Do(req)
+				if err != nil {
+					continue
+				}
+				defer resp.Body.Close()
+
+				image, err := s.gyazo.Upload(resp.Body)
+				if err != nil {
+					fileURL = append(fileURL, f.URLPrivate)
+					continue
+				}
+				fileURL = append(fileURL, image.PermalinkURL+"."+f.Filetype)
+			} else {
 				fileURL = append(fileURL, f.URLPrivate)
-				continue
 			}
-			fileURL = append(fileURL, image.PermalinkURL+"."+f.Filetype)
-		} else {
-			fileURL = append(fileURL, f.URLPrivate)
+
 		}
-
 	}
-
 	var text string = ev.Text
 
 	for _, id := range s.regExp.UserID.FindAllStringSubmatch(ev.Text, -1) {

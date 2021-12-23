@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const DiscordAPIEndpoint = "https://discord.com/api"
+
 type DiscordHandler struct {
 	Session *discordgo.Session
 	regExp  struct {
@@ -154,11 +156,12 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 }
 
 type VoiceEvent int
+
 const (
-	VoiceLeft VoiceEvent = iota
-	VoiceEmptied VoiceEvent = iota
+	VoiceLeft         VoiceEvent = iota
+	VoiceEmptied      VoiceEvent = iota
 	VoiceStateChanged VoiceEvent = iota
-	VoiceEntered VoiceEvent = iota
+	VoiceEntered      VoiceEvent = iota
 )
 
 func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
@@ -238,9 +241,9 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 		}
 	}
 	var message = SlackHookBlock{
-		Channel: setting.SlackChannel,
-		Name:    "Discord Watcher",
-		Blocks:  blocks,
+		Channel:   setting.SlackChannel,
+		Name:      "Discord Watcher",
+		Blocks:    blocks,
 		IconEmoji: "discord",
 	}
 	switch event {

@@ -133,3 +133,12 @@ LISTEN_ADDRESS=Listen addr
 ```
 STATE_DIRECTORY=/var/lib/...(例)
 ```
+
+## Copyright
+
+### noto-emoji
+
+© 2021 The M+ FONTS Project Authors
+
+Google Inc.
+Arjen Nienhuis <a.g.nienhuis@gmail.com>
