@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -23,6 +21,9 @@ type DiscordReactionHandler struct {
 
 	gyazo          *GyazoHandler
 	reactionImager ReactionImagerType
+
+	slack   MessageGetter
+	escaper MessageEscaper
 }
 
 type ReactionImagerType interface {
@@ -63,8 +64,16 @@ func NewDiscordReactionHandler(token string, gyazo *GyazoHandler) *DiscordReacti
 	}
 }
 
-func (d *DiscordReactionHandler) AddReactionImager(imager ReactionImagerType) {
+func (d *DiscordReactionHandler) SetReactionImager(imager ReactionImagerType) {
 	d.reactionImager = imager
+}
+
+func (d *DiscordReactionHandler) SetMessageEscaper(escaper MessageEscaper) {
+	d.escaper = escaper
+}
+
+func (d *DiscordReactionHandler) SetMessageGetter(getter MessageGetter) {
+	d.slack = getter
 }
 
 func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) error {
@@ -92,39 +101,19 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 		return err
 	}
 
-	// TODO: choose the correct message
-
-	var unixTimeStamp = strings.Split(timestamp, ".")
-
-	var i int
-	var unixSec int64
-	var numChar = len([]rune(unixTimeStamp[0]))
-	for _, nstr := range unixTimeStamp[0] {
-
-		num, err := strconv.Atoi(string(nstr))
-		if err != nil {
-			return err
-		}
-
-		unixSec += int64(float64(num) * math.Pow10(numChar-i-1))
-		i++
+	srcContent, err := d.slack.GetMessage(channel, timestamp)
+	if err != nil {
+		return err
 	}
 
-	unixNanoSec, err := strconv.Atoi(unixTimeStamp[0])
+	srcContent, err = d.escaper.EscapeMessage(srcContent)
 	if err != nil {
 		return err
 	}
 
 	var message DiscordMessage
-
-	srcTime := time.Unix(unixSec, int64(unixNanoSec))
 	for i, msg := range messages {
-		t, err := msg.Timestamp.Parse()
-		if err != nil {
-			continue
-		}
-
-		if srcTime.UnixMilli() > t.UnixMilli() {
+		if srcContent == msg.Content {
 			if i == 0 {
 				return fmt.Errorf("illigal time")
 			}
@@ -282,7 +271,6 @@ func (d *DiscordReactionHandler) writePartValue(mw *multipart.Writer, name, valu
 }
 
 func (d *DiscordReactionHandler) createMessage(channelID, content string) (Err error) {
-
 	var requestAttr = make(url.Values)
 
 	requestAttr.Set("name", DiscordReactionThreadName)
@@ -361,7 +349,6 @@ func (d *DiscordReactionHandler) findOwnThread(guildID, channelID string) (chann
 }
 
 func (d *DiscordReactionHandler) startThread(channelID, messageID string) (channel discordgo.Channel, err error) {
-
 	var requestAttr = make(url.Values)
 
 	requestAttr.Set("name", DiscordReactionThreadName)
