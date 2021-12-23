@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -75,71 +74,71 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 			return
 		}
 
-		if d.regExp.replace.MatchString(m.Content) && m.Author.ID == reference.Author.ID {
-			err := d.deleteMessage(m.ChannelID, m.ID)
-			if err != nil {
-				log.Println(err)
-			}
+		// if d.regExp.replace.MatchString(m.Content) && m.Author.ID == reference.Author.ID {
+		// 	err := d.deleteMessage(m.ChannelID, m.ID)
+		// 	if err != nil {
+		// 		log.Println(err)
+		// 	}
 
-			var message DiscordMessage
-			message.Message = reference
-			message.Attachments = make([]DiscordAttachment, 0)
+		// 	var message DiscordMessage
+		// 	message.Message = reference
+		// 	message.Attachments = make([]DiscordAttachment, 0)
 
-			for i := range message.Message.Attachments {
-				if message.Message.Attachments[i] == nil {
-					continue
-				}
+		// 	for i := range message.Message.Attachments {
+		// 		if message.Message.Attachments[i] == nil {
+		// 			continue
+		// 		}
 
-				var oldAtt = message.Message.Attachments[i]
+		// 		var oldAtt = message.Message.Attachments[i]
 
-				id, err := strconv.Atoi(oldAtt.ID)
-				if err != nil {
-					continue
-				}
+		// 		id, err := strconv.Atoi(oldAtt.ID)
+		// 		if err != nil {
+		// 			continue
+		// 		}
 
-				message.Attachments = append(message.Attachments, DiscordAttachment{
-					URL:      oldAtt.URL,
-					ID:       id,
-					ProxyURL: oldAtt.ProxyURL,
-					Filename: oldAtt.Filename,
-					Width:    oldAtt.Width,
-					Height:   oldAtt.Height,
-					Size:     oldAtt.Size,
-				})
-			}
+		// 		message.Attachments = append(message.Attachments, DiscordAttachment{
+		// 			URL:      oldAtt.URL,
+		// 			ID:       id,
+		// 			ProxyURL: oldAtt.ProxyURL,
+		// 			Filename: oldAtt.Filename,
+		// 			Width:    oldAtt.Width,
+		// 			Height:   oldAtt.Height,
+		// 			Size:     oldAtt.Size,
+		// 		})
+		// 	}
 
-			var newContent = reference.Content
-			var newContentSlice = strings.Split(newContent, "\n")
+		// 	var newContent = reference.Content
+		// 	var newContentSlice = strings.Split(newContent, "\n")
 
-			var refMatch = d.regExp.refURI.MatchString(newContentSlice[len(newContentSlice)-1])
-			if refMatch {
-				newContent = strings.Join(newContentSlice[1:len(newContentSlice)-1], "\n")
-			}
+		// 	var refMatch = d.regExp.refURI.MatchString(newContentSlice[len(newContentSlice)-1])
+		// 	if refMatch {
+		// 		newContent = strings.Join(newContentSlice[1:len(newContentSlice)-1], "\n")
+		// 	}
 
-			// replace and fix message
-			var matches = d.regExp.replace.FindAllStringSubmatch(m.Content, -1)
-			for _, match := range matches {
-				newContent = strings.ReplaceAll(newContent, match[1], match[2])
-			}
+		// 	// replace and fix message
+		// 	var matches = d.regExp.replace.FindAllStringSubmatch(m.Content, -1)
+		// 	for _, match := range matches {
+		// 		newContent = strings.ReplaceAll(newContent, match[1], match[2])
+		// 	}
 
-			if refMatch {
-				newContent = strings.Join(
-					[]string{
-						newContentSlice[0],
-						newContent,
-						newContentSlice[len(newContentSlice)-1],
-					}, "\n",
-				)
-			}
+		// 	if refMatch {
+		// 		newContent = strings.Join(
+		// 			[]string{
+		// 				newContentSlice[0],
+		// 				newContent,
+		// 				newContentSlice[len(newContentSlice)-1],
+		// 			}, "\n",
+		// 		)
+		// 	}
 
-			message.Content = newContent
-			err = DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
-			if err != nil {
-				return
-			}
+		// 	message.Content = newContent
+		// 	err = DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
+		// 	if err != nil {
+		// 		return
+		// 	}
 
-			return
-		}
+		// 	return
+		// }
 	}
 
 	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
