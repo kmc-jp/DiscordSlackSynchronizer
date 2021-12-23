@@ -75,7 +75,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 			return
 		}
 
-		if d.regExp.replace.MatchString(m.Content) {
+		if d.regExp.replace.MatchString(m.Content) && m.Author.ID == reference.Author.ID {
 			err := d.deleteMessage(m.ChannelID, m.ID)
 			if err != nil {
 				log.Println(err)
