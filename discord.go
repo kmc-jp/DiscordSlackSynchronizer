@@ -59,6 +59,16 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		return
 	}
 
+	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
+	if sdt.SlackChannel == "" {
+		return
+	}
+
+	//Confirm Discord to Slack
+	if !sdt.Setting.DiscordToSlack {
+		return
+	}
+
 	// Delete message on Discord
 	err := d.deleteMessage(m.ChannelID, m.ID)
 	if err != nil {
@@ -79,16 +89,6 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 
 	// Send by webhook
 	discordMessage.Send()
-
-	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
-	if sdt.SlackChannel == "" {
-		return
-	}
-
-	//Confirm Discord to Slack
-	if !sdt.Setting.DiscordToSlack {
-		return
-	}
 
 	var imageURIs = []string{}
 	var fileURL string
