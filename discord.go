@@ -191,9 +191,15 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		name = m.Author.Username
 	}
 
+	primaryID, err := dp.GetPrimaryID(m.Author.ID)
+	if err != nil {
+		log.Println(err)
+		primaryID = m.Author.ID
+	}
+
 	var dMessage = DiscordMessage{
 		AvaterURL: m.Author.AvatarURL(""),
-		UserName:  fmt.Sprintf("%s(%s)", name, m.Author.ID),
+		UserName:  fmt.Sprintf("%s(%s)", name, primaryID),
 		Message: &discordgo.Message{
 			ChannelID: m.ChannelID,
 			Content:   m.Content,
