@@ -201,12 +201,6 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		}
 	}
 
-	// Delete message on Discord
-	err = d.deleteMessage(m.ChannelID, m.ID)
-	if err != nil {
-		log.Println(err)
-	}
-
 	var name string = m.Member.Nick
 	if name == "" {
 		name = m.Author.Username
@@ -244,8 +238,14 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		)
 	}
 
-	// Send by webhook
-	DiscordWebhook.Send(m.ChannelID, m.ID, dMessage, []DiscordFile{})
+	// Delete message on Discord
+	err = d.deleteMessage(m.ChannelID, m.ID)
+	if err != nil {
+		log.Println(err)
+	} else {
+		// if it was successed, send message by webhook
+		DiscordWebhook.Send(m.ChannelID, m.ID, dMessage, []DiscordFile{})
+	}
 
 	var imageURIs = []string{}
 	var fileURL string
@@ -450,6 +450,10 @@ func (d *DiscordHandler) deleteMessage(channelID, messageID string) (err error) 
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 204 {
+		return fmt.Errorf("FailedToDeleteMessage")
+	}
 
 	return nil
 }
