@@ -31,11 +31,9 @@ func (e *externalPlugin) exec(input string) (output string, err error) {
 	var stdout = new(bytes.Buffer)
 	var stderr = new(bytes.Buffer)
 
-	cmd = &exec.Cmd{
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
-	}
+	cmd.Stdin = stdin
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	stdin.WriteString(input)
 
@@ -44,7 +42,7 @@ func (e *externalPlugin) exec(input string) (output string, err error) {
 		var buf = make([]byte, 100)
 		var n int
 
-		for ; err == nil; n, err = stdout.Read(buf) {
+		for ; err == nil; n, err = stderr.Read(buf) {
 			fmt.Fprintf(os.Stderr, "%s", buf[:n])
 		}
 	}()
