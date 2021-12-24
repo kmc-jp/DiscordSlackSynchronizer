@@ -6,9 +6,11 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	dp "github.com/kmc-jp/DiscordSlackSynchronizer/discord_plugin"
 	"github.com/pkg/errors"
 )
 
@@ -74,71 +76,98 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 			return
 		}
 
-		// if d.regExp.replace.MatchString(m.Content) && m.Author.ID == reference.Author.ID {
-		// 	err := d.deleteMessage(m.ChannelID, m.ID)
-		// 	if err != nil {
-		// 		log.Println(err)
-		// 	}
+		err = func() (err error) {
+			if !d.regExp.replace.MatchString(m.Content) {
+				return
+			}
 
-		// 	var message DiscordMessage
-		// 	message.Message = reference
-		// 	message.Attachments = make([]DiscordAttachment, 0)
+			id, err := d.parseUserName(reference.Author)
+			if err != nil {
+				return err
+			}
 
-		// 	for i := range message.Message.Attachments {
-		// 		if message.Message.Attachments[i] == nil {
-		// 			continue
-		// 		}
+			ids, err := dp.GetDiscordID(id)
+			if err != nil {
+				return err
+			}
 
-		// 		var oldAtt = message.Message.Attachments[i]
+			var check bool
+			for _, id := range ids {
+				if id == m.Author.ID {
+					check = true
+				}
+			}
+			if !check {
+				return fmt.Errorf("InvalidUpdateMessage")
+			}
 
-		// 		id, err := strconv.Atoi(oldAtt.ID)
-		// 		if err != nil {
-		// 			continue
-		// 		}
+			err = d.deleteMessage(m.ChannelID, m.ID)
+			if err != nil {
+				log.Println(err)
+			}
 
-		// 		message.Attachments = append(message.Attachments, DiscordAttachment{
-		// 			URL:      oldAtt.URL,
-		// 			ID:       id,
-		// 			ProxyURL: oldAtt.ProxyURL,
-		// 			Filename: oldAtt.Filename,
-		// 			Width:    oldAtt.Width,
-		// 			Height:   oldAtt.Height,
-		// 			Size:     oldAtt.Size,
-		// 		})
-		// 	}
+			var message DiscordMessage
+			message.Message = reference
+			message.Attachments = make([]DiscordAttachment, 0)
 
-		// 	var newContent = reference.Content
-		// 	var newContentSlice = strings.Split(newContent, "\n")
+			for i := range message.Message.Attachments {
+				if message.Message.Attachments[i] == nil {
+					continue
+				}
 
-		// 	var refMatch = d.regExp.refURI.MatchString(newContentSlice[len(newContentSlice)-1])
-		// 	if refMatch {
-		// 		newContent = strings.Join(newContentSlice[1:len(newContentSlice)-1], "\n")
-		// 	}
+				var oldAtt = message.Message.Attachments[i]
 
-		// 	// replace and fix message
-		// 	var matches = d.regExp.replace.FindAllStringSubmatch(m.Content, -1)
-		// 	for _, match := range matches {
-		// 		newContent = strings.ReplaceAll(newContent, match[1], match[2])
-		// 	}
+				id, err := strconv.Atoi(oldAtt.ID)
+				if err != nil {
+					continue
+				}
 
-		// 	if refMatch {
-		// 		newContent = strings.Join(
-		// 			[]string{
-		// 				newContentSlice[0],
-		// 				newContent,
-		// 				newContentSlice[len(newContentSlice)-1],
-		// 			}, "\n",
-		// 		)
-		// 	}
+				message.Attachments = append(message.Attachments, DiscordAttachment{
+					URL:      oldAtt.URL,
+					ID:       id,
+					ProxyURL: oldAtt.ProxyURL,
+					Filename: oldAtt.Filename,
+					Width:    oldAtt.Width,
+					Height:   oldAtt.Height,
+					Size:     oldAtt.Size,
+				})
+			}
 
-		// 	message.Content = newContent
-		// 	err = DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
-		// 	if err != nil {
-		// 		return
-		// 	}
+			var newContent = reference.Content
+			var newContentSlice = strings.Split(newContent, "\n")
 
-		// 	return
-		// }
+			var refMatch = d.regExp.refURI.MatchString(newContentSlice[len(newContentSlice)-1])
+			if refMatch {
+				newContent = strings.Join(newContentSlice[1:len(newContentSlice)-1], "\n")
+			}
+
+			// replace and fix message
+			var matches = d.regExp.replace.FindAllStringSubmatch(m.Content, -1)
+			for _, match := range matches {
+				newContent = strings.ReplaceAll(newContent, match[1], match[2])
+			}
+
+			if refMatch {
+				newContent = strings.Join(
+					[]string{
+						newContentSlice[0],
+						newContent,
+						newContentSlice[len(newContentSlice)-1],
+					}, "\n",
+				)
+			}
+
+			message.Content = newContent
+			err = DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
+			if err != nil {
+				return
+			}
+
+			return
+		}()
+		if err == nil {
+			return
+		}
 	}
 
 	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
@@ -164,7 +193,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 
 	var dMessage = DiscordMessage{
 		AvaterURL: m.Author.AvatarURL(""),
-		UserName:  name,
+		UserName:  fmt.Sprintf("%s(%s)", name, m.Author.ID),
 		Message: &discordgo.Message{
 			ChannelID: m.ChannelID,
 			Content:   m.Content,
@@ -396,4 +425,14 @@ func (d *DiscordHandler) deleteMessage(channelID, messageID string) (err error) 
 	defer resp.Body.Close()
 
 	return nil
+}
+
+func (d *DiscordHandler) parseUserName(m *discordgo.User) (string, error) {
+	var nameSlice = strings.Split(m.Username, "(")
+	if len(nameSlice) < 1 {
+		return "", fmt.Errorf("Mal-FormedName")
+	}
+
+	var id = strings.Split(nameSlice[len(nameSlice)-1], ")")[0]
+	return id, nil
 }

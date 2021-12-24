@@ -1,4 +1,4 @@
-package main
+package slack_emoji_imager
 
 import (
 	"bytes"
@@ -32,24 +32,26 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-var SlackEmojiImagerErrorNoReactions = errors.Errorf("NoReactions")
+var ErrorNoReactions = errors.Errorf("NoReactions")
 
-type SlackEmojiImager struct {
-	EmojiList SlackEmojiList
+const SlackAPIEndpoint = "https://slack.com/api"
+
+type Imager struct {
+	EmojiList EmojiList
 	userToken string
 	botToken  string
 }
 
-type SlackEmojiList map[string]string
+type EmojiList map[string]string
 
-type SlackMessageReaction struct {
+type MessageReaction struct {
 	Emoji string
 	Num   int
 }
 
-func NewSlackEmojiImager(userToken, botToken string) (*SlackEmojiImager, error) {
-	var imager = &SlackEmojiImager{
-		EmojiList: make(SlackEmojiList),
+func New(userToken, botToken string) (*Imager, error) {
+	var imager = &Imager{
+		EmojiList: make(EmojiList),
 		userToken: userToken,
 		botToken:  botToken,
 	}
@@ -58,7 +60,7 @@ func NewSlackEmojiImager(userToken, botToken string) (*SlackEmojiImager, error) 
 	return imager, err
 }
 
-func (s *SlackEmojiImager) MakeReactionsImage(channel string, timestamp string) (r io.Reader, err error) {
+func (s *Imager) MakeReactionsImage(channel string, timestamp string) (r io.Reader, err error) {
 	const ReactionEmojiSize = 20
 	const ReactionNumSize = 20
 	const ReactionMerginSize = 5
@@ -121,7 +123,7 @@ func (s *SlackEmojiImager) MakeReactionsImage(channel string, timestamp string) 
 	var reactions = responseAttr.Message.Reactions
 
 	if len(reactions) == 0 {
-		return nil, SlackEmojiImagerErrorNoReactions
+		return nil, ErrorNoReactions
 	}
 
 	var maxFrame int = 1
@@ -389,7 +391,7 @@ func (s *SlackEmojiImager) MakeReactionsImage(channel string, timestamp string) 
 	return encodedGIF, nil
 }
 
-func (s *SlackEmojiImager) fillFrame(frame *image.Paletted, c color.Color) *image.Paletted {
+func (s *Imager) fillFrame(frame *image.Paletted, c color.Color) *image.Paletted {
 	var rect = frame.Rect
 	var newFrame = &image.Paletted{}
 
@@ -403,7 +405,7 @@ func (s *SlackEmojiImager) fillFrame(frame *image.Paletted, c color.Color) *imag
 
 	return newFrame
 }
-func (s *SlackEmojiImager) paralleExec(max int, execFunc func(from, to int)) {
+func (s *Imager) paralleExec(max int, execFunc func(from, to int)) {
 	var cpus = runtime.NumCPU()
 	var wg sync.WaitGroup
 
@@ -435,7 +437,7 @@ func (s *SlackEmojiImager) paralleExec(max int, execFunc func(from, to int)) {
 	wg.Wait()
 }
 
-func (s *SlackEmojiImager) getEmojiList() error {
+func (s *Imager) getEmojiList() error {
 	type emojiListAPIResponse struct {
 		OK    bool              `json:"ok"`
 		Error string            `json:"error"`
@@ -474,15 +476,15 @@ func (s *SlackEmojiImager) getEmojiList() error {
 	return err
 }
 
-func (s *SlackEmojiImager) AddEmoji(name string, uri string) {
+func (s *Imager) AddEmoji(name string, uri string) {
 	s.EmojiList[name] = uri
 }
 
-func (s *SlackEmojiImager) RemoveEmoji(name string) {
+func (s *Imager) RemoveEmoji(name string) {
 	delete(s.EmojiList, name)
 }
 
-func (s *SlackEmojiImager) GetEmojiURI(name string) string {
+func (s *Imager) GetEmojiURI(name string) string {
 	var uri = s.EmojiList[name]
 	if strings.HasPrefix(uri, "alias:") {
 		uri = s.GetEmojiURI(strings.TrimPrefix(uri, "aslias:"))

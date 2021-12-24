@@ -10,6 +10,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/configurator"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
 )
 
 type Token struct {
@@ -54,12 +55,12 @@ func main() {
 		fmt.Println("Gyazo initialize error:", err)
 	}
 
-	imager, err := NewSlackEmojiImager(Tokens.Slack.User, Tokens.Slack.API)
+	imager, err := slack_emoji_imager.New(Tokens.Slack.User, Tokens.Slack.API)
 	if err != nil {
 		fmt.Println("Imager initialize error:", err)
 	}
 
-	var discordReactionHandler = NewDiscordReactionHandler(Tokens.Discord.API, Gyazo)
+	var discordReactionHandler = NewDiscordReactionHandler(Tokens.Discord.API)
 	discordReactionHandler.SetReactionImager(imager)
 
 	if Tokens.Discord.API == "" {

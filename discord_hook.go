@@ -13,16 +13,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-//DiscordHookMessage DiscordにIncommingWebhook経由のMessage送信形式
-type DiscordHookMessage struct {
-	*discordgo.Message
-	Channel string `json:"channel_id"`
-	Server  string `json:"guild_id"`
-	Name    string `json:"username"`
-	Text    string `json:"content"`
-	IconURL string `json:"avatar_url"`
-}
-
 type DiscordWebhookType struct {
 	webhookByChannelID map[string]*discordgo.Webhook
 	createWebhookLock  map[string]*sync.RWMutex
@@ -50,24 +40,6 @@ func (d *DiscordWebhookType) createWebhook(channelID string) *discordgo.Webhook 
 		return webhook
 	}
 	return webhooks[0]
-}
-
-func (d *DiscordWebhookType) Get(channelID string) *discordgo.Webhook {
-	_, ok := d.createWebhookLock[channelID]
-	if !ok {
-		d.createWebhookLock[channelID] = &sync.RWMutex{}
-	}
-	webhook := func() *discordgo.Webhook {
-		d.createWebhookLock[channelID].RLock()
-		defer d.createWebhookLock[channelID].RUnlock()
-		return d.webhookByChannelID[channelID]
-	}()
-	if webhook != nil {
-		return webhook
-	}
-	webhook = d.createWebhook(channelID)
-	d.webhookByChannelID[channelID] = webhook
-	return webhook
 }
 
 func (d *DiscordWebhookType) send(method, channelID, messageID string, message DiscordMessage, files []DiscordFile) (err error) {
@@ -142,11 +114,25 @@ func (d *DiscordWebhookType) send(method, channelID, messageID string, message D
 	}
 	defer resp.Body.Close()
 
-	var buf = new(bytes.Buffer)
-	io.Copy(buf, resp.Body)
-	fmt.Println(buf.String())
-
 	return
+}
+
+func (d *DiscordWebhookType) Get(channelID string) *discordgo.Webhook {
+	_, ok := d.createWebhookLock[channelID]
+	if !ok {
+		d.createWebhookLock[channelID] = &sync.RWMutex{}
+	}
+	webhook := func() *discordgo.Webhook {
+		d.createWebhookLock[channelID].RLock()
+		defer d.createWebhookLock[channelID].RUnlock()
+		return d.webhookByChannelID[channelID]
+	}()
+	if webhook != nil {
+		return webhook
+	}
+	webhook = d.createWebhook(channelID)
+	d.webhookByChannelID[channelID] = webhook
+	return webhook
 }
 
 func (d *DiscordWebhookType) Edit(channelID, messageID string, message DiscordMessage, files []DiscordFile) (err error) {

@@ -5,19 +5,18 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
 )
 
 type DiscordReactionHandler struct {
 	token string
 
-	gyazo          *GyazoHandler
 	reactionImager ReactionImagerType
 
 	slack   MessageGetter
@@ -81,10 +80,9 @@ type DiscordFile struct {
 
 const DiscordReactionThreadName = "SlackEmoji"
 
-func NewDiscordReactionHandler(token string, gyazo *GyazoHandler) *DiscordReactionHandler {
+func NewDiscordReactionHandler(token string) *DiscordReactionHandler {
 	return &DiscordReactionHandler{
 		token: token,
-		gyazo: gyazo,
 	}
 }
 
@@ -109,7 +107,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 	switch err {
 	case nil:
 		break
-	case SlackEmojiImagerErrorNoReactions:
+	case slack_emoji_imager.ErrorNoReactions:
 		zeroReaction = true
 	default:
 		return err
@@ -186,17 +184,6 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 	}
 
 	return DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{file})
-}
-
-func (d *DiscordReactionHandler) writePartValue(mw *multipart.Writer, name, value string) error {
-	pw, err := mw.CreateFormField(name)
-	if err != nil {
-		return err
-	}
-
-	pw.Write([]byte(value))
-
-	return nil
 }
 
 func (d *DiscordReactionHandler) getMessages(channelID, timestamp string) (messages []discordgo.Message, err error) {
