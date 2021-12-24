@@ -151,7 +151,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 				newContent = strings.Join(newContentSlice[1:len(newContentSlice)-1], "\n")
 			}
 
-			// replace and fix message
+			// replace and update message
 			for _, pattern := range strings.Split(m.Content, "\n") {
 				var matches = strings.Split(pattern, "/")
 				var escapedMatch = []string{}
