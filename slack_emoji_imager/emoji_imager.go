@@ -61,8 +61,8 @@ func New(userToken, botToken string) (*Imager, error) {
 }
 
 func (s *Imager) MakeReactionsImage(channel string, timestamp string) (r io.Reader, err error) {
-	const ReactionEmojiSize = 20
-	const ReactionNumSize = 20
+	const ReactionEmojiSize = 50
+	const ReactionNumSize = 50
 	const ReactionMerginSize = 5
 	const LaneReactionNum = 8
 	const EmojiFilePath = "NotoColorEmoji"
