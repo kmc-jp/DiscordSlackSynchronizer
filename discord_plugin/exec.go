@@ -49,7 +49,7 @@ func (e *externalPlugin) exec(input string) (output string, err error) {
 		}
 	}()
 
-	err = cmd.Wait()
+	err = cmd.Run()
 	if err != nil {
 		return
 	}
