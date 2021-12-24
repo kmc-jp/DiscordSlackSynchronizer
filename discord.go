@@ -42,7 +42,7 @@ func NewDiscordBot(apiToken string) *DiscordHandler {
 	d.regExp.UserID = regexp.MustCompile(`<@!(\d+)>`)
 	d.regExp.Channel = regexp.MustCompile(`<#(\d+)>`)
 	d.regExp.ImageURI = regexp.MustCompile(`\S\.png|\.jpg|\.jpeg|\.gif`)
-	d.regExp.replace = regexp.MustCompile(`\s*ss/(.+)/(.*)\s*`)
+	d.regExp.replace = regexp.MustCompile(`\s*ss/(.+)/(.*)/?\s*`)
 	d.regExp.refURI = regexp.MustCompile(`\(RefURI:\s<https:.+>\)`)
 
 	dg.AddHandler(d.voiceState)
@@ -63,6 +63,16 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	// Ignore all messages created by the bot itself
 	// This isn't required in this specific example but it's a good practice.
 	if m.Author.ID == s.State.User.ID || m.Author.Bot {
+		return
+	}
+
+	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
+	if sdt.SlackChannel == "" {
+		return
+	}
+
+	//Confirm Discord to Slack
+	if !sdt.Setting.DiscordToSlack {
 		return
 	}
 
@@ -168,16 +178,6 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		if err == nil {
 			return
 		}
-	}
-
-	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
-	if sdt.SlackChannel == "" {
-		return
-	}
-
-	//Confirm Discord to Slack
-	if !sdt.Setting.DiscordToSlack {
-		return
 	}
 
 	// Delete message on Discord
