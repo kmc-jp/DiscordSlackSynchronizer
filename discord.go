@@ -42,7 +42,7 @@ func NewDiscordBot(apiToken string) *DiscordHandler {
 	d.regExp.UserID = regexp.MustCompile(`<@!(\d+)>`)
 	d.regExp.Channel = regexp.MustCompile(`<#(\d+)>`)
 	d.regExp.ImageURI = regexp.MustCompile(`\S\.png|\.jpg|\.jpeg|\.gif`)
-	d.regExp.replace = regexp.MustCompile(`\s*ss/(.+)/(.*)/?\s*`)
+	d.regExp.replace = regexp.MustCompile(`\s*ss\/(.+)\/(.*)(\/)??\s*`)
 	d.regExp.refURI = regexp.MustCompile(`\(RefURI:\s<https:.+>\)`)
 
 	dg.AddHandler(d.voiceState)
@@ -152,9 +152,29 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 			}
 
 			// replace and fix message
-			var matches = d.regExp.replace.FindAllStringSubmatch(m.Content, -1)
-			for _, match := range matches {
-				newContent = strings.ReplaceAll(newContent, match[1], match[2])
+			for _, pattern := range strings.Split(m.Content, "\n") {
+				var matches = strings.Split(pattern, "/")
+				var escapedMatch = []string{}
+				var tmp string
+				for i, match := range matches {
+					if i < 1 {
+						continue
+					}
+					if tmp != "" {
+						match = tmp + "/" + match
+						tmp = ""
+					}
+					if strings.HasSuffix(match, "\\") && !strings.HasSuffix(match, "\\\\") {
+						tmp = strings.TrimSuffix(match, "\\")
+						continue
+					}
+
+					escapedMatch = append(escapedMatch, match)
+				}
+				if len(escapedMatch) < 2 {
+					return fmt.Errorf("Mal-formedExpression")
+				}
+				newContent = strings.ReplaceAll(newContent, escapedMatch[0], escapedMatch[1])
 			}
 
 			if refMatch {
@@ -170,6 +190,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 			message.Content = newContent
 			err = DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
 			if err != nil {
+				log.Printf("EditError: %s\n", err)
 				return
 			}
 
