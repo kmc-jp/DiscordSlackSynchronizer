@@ -64,13 +64,13 @@ func (s *Imager) MakeReactionsImage(channel string, timestamp string) (r io.Read
 	const ReactionEmojiSize = 20
 	const ReactionNumSize = 20
 	const ReactionMerginSize = 5
-	const LaneReactionNum = 5
+	const LaneReactionNum = 8
 	const EmojiFilePath = "NotoColorEmoji"
 
 	var colorPalette = append(palette.WebSafe, image.Transparent)
 
 	var ReactionWidth = ReactionEmojiSize + ReactionNumSize + ReactionMerginSize*2
-	var ImageWidth = ReactionWidth * 5
+	var ImageWidth = ReactionWidth * LaneReactionNum
 	var ImageLaneHeight = ReactionMerginSize*2 + ReactionEmojiSize
 
 	// Get Slack Message Reactions
