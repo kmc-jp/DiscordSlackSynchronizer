@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,7 +10,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	dp "github.com/kmc-jp/DiscordSlackSynchronizer/discord_plugin"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
+	"github.com/slack-go/slack"
 )
 
 const DiscordAPIEndpoint = "https://discord.com/api"
@@ -27,6 +28,9 @@ type DiscordHandler struct {
 		replace *regexp.Regexp
 		refURI  *regexp.Regexp
 	}
+
+	slackLastMessages SlackLastMessages
+	slackWebhook      *slack_webhook.Handler
 }
 
 func NewDiscordBot(apiToken string) *DiscordHandler {
@@ -49,7 +53,13 @@ func NewDiscordBot(apiToken string) *DiscordHandler {
 	dg.AddHandler(d.voiceState)
 	dg.AddHandler(d.watch)
 
+	d.slackLastMessages = SlackLastMessages{}
+
 	return &d
+}
+
+func (d *DiscordHandler) SetSlackWebhook(hook *slack_webhook.Handler) {
+	d.slackWebhook = hook
 }
 
 func (d *DiscordHandler) Close() error {
@@ -307,9 +317,9 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		content = content + fileURL
 	}
 
-	var attachments = []SlackAttachment{}
+	var attachments = []slack.Attachment{}
 	for _, imageURI := range imageURIs {
-		var attachment SlackAttachment
+		var attachment slack.Attachment
 
 		attachment.ImageURL = imageURI
 		attachments = append(attachments, attachment)
@@ -322,16 +332,19 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		content += fmt.Sprintf(" <%s%s|%s>", SlackMessageDummyURI, m.Message.Timestamp, "ㅤ")
 	}
 
-	var message = SlackHookMessage{
-		Channel:     sdt.SlackChannel,
-		Name:        name,
-		Text:        content,
+	var message = slack_webhook.Message{
 		IconURL:     m.Author.AvatarURL(""),
+		Username:    name,
+		Channel:     sdt.SlackChannel,
+		Text:        content,
 		Attachments: attachments,
+		UnfurlLinks: true,
+		UnfurlMedia: true,
+		LinkNames:   true,
 	}
 
 	// Send message to Slack
-	message.Send()
+	d.slackWebhook.Send(message)
 }
 
 type VoiceEvent int
@@ -401,7 +414,7 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 	if !setting.Setting.SendVoiceState {
 		return
 	}
-	var blocks []json.RawMessage
+	var blocks []slack_webhook.BlockBase
 	var err error
 	if setting.DiscordChannel == "all" {
 		blocks, err = channels.SlackBlocksMultiChannel()
@@ -414,26 +427,83 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 		if !ok {
 			fmt.Print("Failed to find channel")
 		}
-		blocks, err = channel.SlackBlocksSingleChannel()
+		blocks = channel.SlackBlocksSingleChannel()
 		if err != nil {
 			fmt.Printf("%v\n", errors.Wrapf(err, "Failed SlackBlock"))
 		}
 	}
-	var message = SlackHookBlock{
-		Channel:   setting.SlackChannel,
-		Name:      "Discord Watcher",
-		Blocks:    blocks,
-		IconEmoji: "discord",
+
+	var message = slack_webhook.Message{
+		Channel:     setting.SlackChannel,
+		Username:    "Discord Watcher",
+		IconEmoji:   "discord",
+		UnfurlLinks: false,
+		UnfurlMedia: false,
+		Blocks:      blocks,
 	}
+
 	switch event {
 	case VoiceEntered:
-		slackIndicator.Popup(message)
+		ts, ok := d.slackLastMessages[message.Channel]
+		if ok {
+			d.slackWebhook.Remove(message.Channel, ts)
+		}
+
+		ts, err = d.slackWebhook.Send(message)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		d.slackLastMessages[message.Channel] = ts
 	case VoiceLeft:
-		slackIndicator.Update(message)
+		ts, ok := d.slackLastMessages[message.Channel]
+		if !ok {
+			ts, ok := d.slackLastMessages[message.Channel]
+			if ok {
+				delete(d.slackLastMessages, message.Channel)
+				d.slackWebhook.Remove(message.Channel, ts)
+			}
+
+			ts, err = d.slackWebhook.Send(message)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			d.slackLastMessages[message.Channel] = ts
+		}
+		message.TS = ts
+		ts, err = d.slackWebhook.Update(message)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		d.slackLastMessages[message.Channel] = ts
+
 	case VoiceStateChanged:
-		slackIndicator.Update(message)
+		ts, ok := d.slackLastMessages[message.Channel]
+		if !ok {
+			d.slackWebhook.Send(message)
+		}
+
+		message.TS = ts
+		ts, err = d.slackWebhook.Update(message)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		d.slackLastMessages[message.Channel] = ts
+
 	case VoiceEmptied:
-		slackIndicator.Remove(message.Channel)
+		ts, ok := d.slackLastMessages[message.Channel]
+		if !ok {
+			return
+		}
+		delete(d.slackLastMessages, message.Channel)
+
+		d.slackWebhook.Remove(message.Channel, ts)
 	}
 }
 

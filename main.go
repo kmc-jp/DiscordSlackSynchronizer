@@ -11,6 +11,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/configurator"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 )
 
 type Token struct {
@@ -34,8 +35,6 @@ var SettingsFile string
 var Slack *SlackHandler
 var Discord *DiscordHandler
 var Gyazo *GyazoHandler
-
-var slackIndicator *SlackIndicator = NewSlackIndicator()
 
 func init() {
 	Tokens.Slack.API = os.Getenv("SLACK_API_TOKEN")
@@ -68,7 +67,11 @@ func main() {
 		return
 	}
 
+	var slackWebhookHandler = slack_webhook.NewWebhook(Tokens.Slack.API)
+
 	Discord = NewDiscordBot(Tokens.Discord.API)
+	Discord.SetSlackWebhook(slackWebhookHandler)
+
 	go func() {
 		err := Discord.Do()
 		if err != nil {

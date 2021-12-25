@@ -14,8 +14,6 @@ import (
 	scm "github.com/slack-go/slack/socketmode"
 )
 
-const SlackAPIEndpoint = "https://slack.com/api"
-
 type SlackHandler struct {
 	api    *slack.Client
 	scm    *scm.Client

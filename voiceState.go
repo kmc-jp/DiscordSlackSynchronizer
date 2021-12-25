@@ -1,12 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/pkg/errors"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 )
 
 var voiceChannels DiscordVoiceChannels = DiscordVoiceChannels{
@@ -112,48 +111,41 @@ func (v *VoiceChannels) Deafened(userID string) {
 	}
 }
 
-func (v VoiceChannels) SlackBlocksMultiChannel() ([]json.RawMessage, error) {
-	blocks := []json.RawMessage{}
+func (v VoiceChannels) SlackBlocksMultiChannel() ([]slack_webhook.BlockBase, error) {
+	var blocks = []slack_webhook.BlockBase{}
 
 	for _, channel := range v.Channels {
 		if len(channel.Users) == 0 {
 			// skip no user channels
 			continue
 		}
-		channelBlocks, err := channel.SlackBlocksSingleChannel()
-		if err != nil {
-			return nil, errors.Wrapf(err, "Channel Slack Block")
-		}
+		var channelBlocks = channel.SlackBlocksSingleChannel()
+
 		blocks = append(blocks, channelBlocks...)
 	}
 	if len(blocks) <= 1 {
-		element, err := MarkdownElement("誰もいない")
-		if err != nil {
-			return nil, errors.Wrapf(err, "Missing Markdown Element")
-		}
-		block, err := ContextBlock([]json.RawMessage{element})
-		if err != nil {
-			return nil, errors.Wrapf(err, "Context Element")
-		}
+		element := slack_webhook.BlockElement{Type: "mrkdwn", Text: "誰もいない"}
+
+		var block = slack_webhook.BlockBase{Type: "context", Elements: []slack_webhook.BlockElement{element}}
 		blocks = append(blocks, block)
 	}
 	return blocks, nil
 }
 
-func (c VoiceChannel) SlackBlocksSingleChannel() ([]json.RawMessage, error) {
-	var blocks = []json.RawMessage{}
+func (c VoiceChannel) SlackBlocksSingleChannel() []slack_webhook.BlockBase {
+	var blocks = []slack_webhook.BlockBase{}
 
 	channelText := fmt.Sprintf("<https://discord.com/channels/%s|%s: >", c.Channel.GuildID, c.Channel.Name)
-	channels, err := MarkdownElement(channelText)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Channel Element")
-	}
 
-	block, err := ContextBlock([]json.RawMessage{channels})
-	if err != nil {
-		return nil, errors.Wrapf(err, "Channel Elements")
-	}
-	blocks = append(blocks, block)
+	var channelNameElement = slack_webhook.BlockElement{Type: "mrkdwn", Text: channelText}
+
+	blocks = append(
+		blocks,
+		slack_webhook.BlockBase{
+			Type:     "context",
+			Elements: []slack_webhook.BlockElement{channelNameElement},
+		},
+	)
 
 	// Sort By User State
 	normal := []*VoiceState{}
@@ -174,7 +166,7 @@ func (c VoiceChannel) SlackBlocksSingleChannel() ([]json.RawMessage, error) {
 	users = append(users, deafened...)
 
 	var userCount int
-	var elements = []json.RawMessage{}
+	var elements = []slack_webhook.BlockElement{}
 
 	for _, user := range users {
 		userImage := user.Member.User.AvatarURL("")
@@ -183,10 +175,12 @@ func (c VoiceChannel) SlackBlocksSingleChannel() ([]json.RawMessage, error) {
 			username = user.Member.User.Username
 		}
 
-		imageElm, err := ImageElement(userImage, username)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Avatar Element")
+		var imageElm = slack_webhook.BlockElement{
+			Type:     "image",
+			ImageURL: userImage,
+			AltText:  username,
 		}
+
 		emoji := ""
 		if user.Muted {
 			emoji = ":discord_muted:"
@@ -194,74 +188,36 @@ func (c VoiceChannel) SlackBlocksSingleChannel() ([]json.RawMessage, error) {
 		if user.Deafened {
 			emoji = ":discord_deafened:"
 		}
+
 		text := fmt.Sprintf("%s%s ", emoji, username)
-		userElm, err := MarkdownElement(text)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Username Element")
-		}
+		var userElm = slack_webhook.BlockElement{Type: "mrkdwn", Text: text}
+
 		elements = append(elements, imageElm, userElm)
 
 		userCount++
 		if userCount%4 == 0 {
-			block, err := ContextBlock(elements)
-			if err != nil {
-				return nil, errors.Wrapf(err, "Channel Elements")
+			var block = slack_webhook.BlockBase{
+				Type:     "context",
+				Elements: elements,
 			}
+
 			blocks = append(blocks, block)
 
-			elements = []json.RawMessage{}
+			elements = []slack_webhook.BlockElement{}
 		}
 	}
 
 	if userCount%4 > 0 {
-		block, err = ContextBlock(elements)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Channel Elements")
+		var block = slack_webhook.BlockBase{
+			Type:     "context",
+			Elements: elements,
 		}
+
 		blocks = append(blocks, block)
 	}
 
-	div, err := DividerBlock()
-	if err != nil {
-		return nil, errors.Wrapf(err, "Divider Block")
-	}
+	var div = slack_webhook.BlockBase{Type: "divider"}
 	blocks = append(blocks, div)
 
-	return blocks, nil
-}
-
-func ContextBlock(elements []json.RawMessage) (json.RawMessage, error) {
-	type block struct {
-		Type     string            `json:"type"`
-		Elements []json.RawMessage `json:"elements"`
-	}
-	res := block{Type: "context", Elements: elements}
-	return json.Marshal(res)
-}
-
-func ImageElement(ImageURL string, AltText string) (json.RawMessage, error) {
-	type element struct {
-		Type     string `json:"type"`
-		ImageURL string `json:"image_url"`
-		AltText  string `json:"alt_text"`
-	}
-	res := element{Type: "image", ImageURL: ImageURL, AltText: AltText}
-	return json.Marshal(res)
-}
-
-func MarkdownElement(text string) (json.RawMessage, error) {
-	type element struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	}
-	res := element{Type: "mrkdwn", Text: text}
-	return json.Marshal(res)
-}
-
-func DividerBlock() (json.RawMessage, error) {
-	type block struct {
-		Type string `json:"type"`
-	}
-	res := block{Type: "divider"}
-	return json.Marshal(res)
+	return blocks
 }
