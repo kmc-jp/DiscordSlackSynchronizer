@@ -5,11 +5,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sync"
 	"syscall"
 
-	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/configurator"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 )
@@ -59,8 +58,11 @@ func main() {
 		fmt.Println("Imager initialize error:", err)
 	}
 
+	var DiscordWebhook = discord_webhook.New(Tokens.Discord.API)
+
 	var discordReactionHandler = NewDiscordReactionHandler(Tokens.Discord.API)
 	discordReactionHandler.SetReactionImager(imager)
+	discordReactionHandler.SetDiscordWebhook(DiscordWebhook)
 
 	if Tokens.Discord.API == "" {
 		fmt.Println("No discord token provided")
@@ -71,6 +73,7 @@ func main() {
 
 	Discord = NewDiscordBot(Tokens.Discord.API)
 	Discord.SetSlackWebhook(slackWebhookHandler)
+	Discord.SetDiscordWebhook(DiscordWebhook)
 
 	go func() {
 		err := Discord.Do()
@@ -85,7 +88,7 @@ func main() {
 	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)
 	Slack.SetGyazoHandler(Gyazo)
 	Slack.SetReactionHandler(discordReactionHandler)
-
+	Slack.SetDiscordWebhook(DiscordWebhook)
 	go Slack.Do()
 
 	discordReactionHandler.SetMessageGetter(Slack)
@@ -106,10 +109,7 @@ func main() {
 			for command := range controller {
 				switch command {
 				case configurator.CommandRestart:
-					DiscordWebhook = DiscordWebhookType{
-						webhookByChannelID: map[string]*discordgo.Webhook{},
-						createWebhookLock:  map[string]*sync.RWMutex{},
-					}
+					DiscordWebhook.Reset()
 				default:
 					continue
 				}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	scm "github.com/slack-go/slack/socketmode"
@@ -26,6 +27,8 @@ type SlackHandler struct {
 	gyazo *GyazoHandler
 
 	messageUnescaper *strings.Replacer
+
+	discordHook *discord_webhook.Handler
 
 	apiToken   string
 	eventToken string
@@ -115,6 +118,10 @@ func (s *SlackHandler) SetReactionHandler(handler ReactionHandler) {
 	s.reactionHandler = handler
 }
 
+func (s *SlackHandler) SetDiscordWebhook(hook *discord_webhook.Handler) {
+	s.discordHook = hook
+}
+
 func (s *SlackHandler) reactionHandle(channel string, timestamp string) {
 	if s.reactionHandler != nil {
 		err := s.reactionHandler.GetReaction(channel, timestamp)
@@ -196,7 +203,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		name = user.RealName
 	}
 
-	var message = DiscordMessage{
+	var message = discord_webhook.Message{
 		AvaterURL: user.Profile.ImageOriginal,
 		UserName:  name,
 		Message: &discordgo.Message{
@@ -207,10 +214,10 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// Send by webhook
-	DiscordWebhook.Send(message.ChannelID, message.ID, message, []DiscordFile{})
+	s.discordHook.Send(message.ChannelID, message.ID, message, []discord_webhook.File{})
 
 	for _, f := range fileURL {
-		message = DiscordMessage{
+		message = discord_webhook.Message{
 			AvaterURL: user.Profile.ImageOriginal,
 			UserName:  name,
 			Message: &discordgo.Message{
@@ -220,7 +227,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 			},
 		}
 
-		DiscordWebhook.Send(message.ChannelID, message.ID, message, []DiscordFile{})
+		s.discordHook.Send(message.ChannelID, message.ID, message, []discord_webhook.File{})
 	}
 }
 

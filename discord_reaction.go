@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
 )
 
@@ -20,6 +21,8 @@ type DiscordReactionHandler struct {
 	token string
 
 	reactionImager ReactionImagerType
+
+	hook *discord_webhook.Handler
 
 	slack   MessageGetter
 	escaper MessageEscaper
@@ -31,56 +34,6 @@ type ReactionImagerType interface {
 	MakeReactionsImage(channel string, timestamp string) (r io.Reader, err error)
 	GetEmojiURI(name string) string
 }
-
-type DiscordMessage struct {
-	*discordgo.Message
-	Components  []DiscordComponent  `json:"components,omitempty"`
-	AvaterURL   string              `json:"avatar_url,omitempty"`
-	Attachments []DiscordAttachment `json:"attachments"`
-	UserName    string              `json:"username,omitempty"`
-}
-
-type DiscordComponent struct {
-	Type        int                `json:"type"`
-	CustomID    string             `json:"custom_id,omitempty"`
-	Disabled    bool               `json:"disabled,omitempty"`
-	Style       int                `json:"style,omitempty"`
-	Label       string             `json:"label,omitempty"`
-	URL         string             `json:"url,omitempty"`
-	Placeholder string             `json:"placeholder,omitempty"`
-	MinValues   int                `json:"min_values,omitempty"`
-	MaxValues   int                `json:"max_values,omitempty"`
-	Components  []DiscordComponent `json:"components,omitempty"`
-	Emoji       *discordgo.Emoji   `json:"emoji,omitempty"`
-	Options     []DiscordOption    `json:"options,omitempty"`
-}
-
-type DiscordOption struct {
-	Label       string           `json:"label"`
-	Value       string           `json:"value"`
-	Description string           `json:"description,omitempty"`
-	Emoji       *discordgo.Emoji `json:"emoji,omitempty"`
-	Default     bool             `json:"default,omitempty"`
-}
-
-type DiscordAttachment struct {
-	URL         string `json:"url,omitempty"`
-	Description string `json:"description,omitempty"`
-	ID          int    `json:"id"`
-	ProxyURL    string `json:"proxy_url,omitempty"`
-	Filename    string `json:"filename,omitempty"`
-	Width       int    `json:"width,omitempty"`
-	Height      int    `json:"height,omitempty"`
-	Size        int    `json:"size,omitempty"`
-}
-
-type DiscordFile struct {
-	FileName    string
-	Reader      io.Reader
-	ContentType string
-}
-
-const DiscordReactionThreadName = "SlackEmoji"
 
 func NewDiscordReactionHandler(token string) *DiscordReactionHandler {
 	return &DiscordReactionHandler{
@@ -98,6 +51,10 @@ func (d *DiscordReactionHandler) SetMessageEscaper(escaper MessageEscaper) {
 
 func (d *DiscordReactionHandler) SetMessageGetter(getter MessageGetter) {
 	d.slack = getter
+}
+
+func (d *DiscordReactionHandler) SetDiscordWebhook(hook *discord_webhook.Handler) {
+	d.hook = hook
 }
 
 func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) error {
@@ -125,7 +82,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 		return err
 	}
 
-	var message DiscordMessage
+	var message discord_webhook.Message
 	if strings.Contains(srcContent, "<"+SlackMessageDummyURI) {
 		var sepMessage = strings.Split(srcContent, "<"+SlackMessageDummyURI)
 		var messageTS = strings.Split(sepMessage[len(sepMessage)-1], "|")[0]
@@ -179,7 +136,7 @@ next:
 		return fmt.Errorf("MessageNotFound")
 	}
 
-	message.Attachments = make([]DiscordAttachment, 0)
+	message.Attachments = make([]discord_webhook.Attachment, 0)
 
 	for i := range message.Message.Attachments {
 		if message.Message.Attachments[i] == nil {
@@ -196,7 +153,7 @@ next:
 			continue
 		}
 
-		message.Attachments = append(message.Attachments, DiscordAttachment{
+		message.Attachments = append(message.Attachments, discord_webhook.Attachment{
 			URL:      oldAtt.URL,
 			ID:       id,
 			ProxyURL: oldAtt.ProxyURL,
@@ -209,16 +166,16 @@ next:
 	}
 
 	if zeroReaction {
-		return DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
+		return d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{})
 	}
 
-	var file = DiscordFile{
+	var file = discord_webhook.File{
 		FileName:    ReactionGifName,
 		Reader:      r,
 		ContentType: "image/gif",
 	}
 
-	return DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{file})
+	return d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{file})
 }
 
 func (d *DiscordReactionHandler) getMessage(channelID, messageID string) (messages discordgo.Message, err error) {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	dp "github.com/kmc-jp/DiscordSlackSynchronizer/discord_plugin"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
@@ -28,6 +29,8 @@ type DiscordHandler struct {
 		replace *regexp.Regexp
 		refURI  *regexp.Regexp
 	}
+
+	hook *discord_webhook.Handler
 
 	slackLastMessages SlackLastMessages
 	slackWebhook      *slack_webhook.Handler
@@ -60,6 +63,10 @@ func NewDiscordBot(apiToken string) *DiscordHandler {
 
 func (d *DiscordHandler) SetSlackWebhook(hook *slack_webhook.Handler) {
 	d.slackWebhook = hook
+}
+
+func (d *DiscordHandler) SetDiscordWebhook(hook *discord_webhook.Handler) {
+	d.hook = hook
 }
 
 func (d *DiscordHandler) Close() error {
@@ -127,9 +134,9 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 				log.Println(err)
 			}
 
-			var message DiscordMessage
+			var message discord_webhook.Message
 			message.Message = reference
-			message.Attachments = make([]DiscordAttachment, 0)
+			message.Attachments = make([]discord_webhook.Attachment, 0)
 
 			for i := range message.Message.Attachments {
 				if message.Message.Attachments[i] == nil {
@@ -143,7 +150,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 					continue
 				}
 
-				message.Attachments = append(message.Attachments, DiscordAttachment{
+				message.Attachments = append(message.Attachments, discord_webhook.Attachment{
 					URL:      oldAtt.URL,
 					ID:       id,
 					ProxyURL: oldAtt.ProxyURL,
@@ -199,7 +206,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 			}
 
 			message.Content = newContent
-			err = DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{})
+			err = d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{})
 			if err != nil {
 				log.Printf("EditError: %s\n", err)
 				return
@@ -223,7 +230,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		primaryID = m.Author.ID
 	}
 
-	var dMessage = DiscordMessage{
+	var dMessage = discord_webhook.Message{
 		AvaterURL: m.Author.AvatarURL(""),
 		UserName:  fmt.Sprintf("%s(%s)", name, primaryID),
 		Message: &discordgo.Message{
@@ -255,7 +262,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		log.Println(err)
 	} else {
 		// if it was successed, send message by webhook
-		DiscordWebhook.Send(m.ChannelID, m.ID, dMessage, []DiscordFile{})
+		d.hook.Send(m.ChannelID, m.ID, dMessage, []discord_webhook.File{})
 	}
 
 	var imageURIs = []string{}
