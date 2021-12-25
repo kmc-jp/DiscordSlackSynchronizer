@@ -51,7 +51,7 @@ type BlockElement struct {
 	Text     string `json:"text,omitempty"`
 }
 
-func NewWebhook(token string) *Handler {
+func New(token string) *Handler {
 	return &Handler{token}
 }
 

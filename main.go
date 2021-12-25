@@ -69,7 +69,7 @@ func main() {
 		return
 	}
 
-	var slackWebhookHandler = slack_webhook.NewWebhook(Tokens.Slack.API)
+	var slackWebhookHandler = slack_webhook.New(Tokens.Slack.API)
 
 	Discord = NewDiscordBot(Tokens.Discord.API)
 	Discord.SetSlackWebhook(slackWebhookHandler)
