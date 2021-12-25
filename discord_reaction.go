@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
@@ -118,26 +120,59 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 		return nil
 	}
 
-	messages, err := d.getMessages(cs.DiscordChannel, timestamp)
-	if err != nil {
-		return err
-	}
-
 	srcContent, err := d.slack.GetMessage(channel, timestamp)
 	if err != nil {
 		return err
 	}
 
-	srcContent, err = d.escaper.EscapeMessage(srcContent)
-	if err != nil {
-		return err
+	var message DiscordMessage
+	if strings.Contains(srcContent, "<"+SlackMessageDummyURI) {
+		var sepMessage = strings.Split(srcContent, "<"+SlackMessageDummyURI)
+		var messageTS = strings.Split(sepMessage[len(sepMessage)-1], "|")[0]
+
+		messages, err := d.getMessages(cs.DiscordChannel, "")
+		if err != nil {
+			return err
+		}
+
+		srcT, err := time.Parse(time.RFC3339, messageTS)
+		if err != nil {
+			goto next
+		}
+
+		for i, msg := range messages {
+			if i == 0 {
+				continue
+			}
+			t, err := msg.Timestamp.Parse()
+			if err != nil {
+				goto next
+			}
+
+			if t.UnixMilli() < srcT.UnixMilli() {
+				message.Message = &messages[i-1]
+				break
+			}
+		}
 	}
 
-	var message DiscordMessage
-	for i, msg := range messages {
-		if srcContent == msg.Content {
-			message.Message = &messages[i]
-			break
+next:
+	if message.Message == nil {
+		messages, err := d.getMessages(cs.DiscordChannel, "")
+		if err != nil {
+			return err
+		}
+
+		srcContent, err = d.escaper.EscapeMessage(srcContent)
+		if err != nil {
+			return err
+		}
+
+		for i, msg := range messages {
+			if srcContent == msg.Content {
+				message.Message = &messages[i]
+				break
+			}
 		}
 	}
 	if message.Message == nil {
@@ -186,14 +221,51 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 	return DiscordWebhook.Edit(message.ChannelID, message.ID, message, []DiscordFile{file})
 }
 
-func (d *DiscordReactionHandler) getMessages(channelID, timestamp string) (messages []discordgo.Message, err error) {
-	if !strings.Contains(timestamp, ".") {
+func (d *DiscordReactionHandler) getMessage(channelID, messageID string) (messages discordgo.Message, err error) {
+	var requestAttr = make(url.Values)
+
+	var client = http.DefaultClient
+	req, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("%s/channels/%s/messages/%s?%s", DiscordAPIEndpoint, channelID, messageID, requestAttr.Encode()),
+		nil,
+	)
+	if err != nil {
 		return
 	}
 
+	req.Header.Set("Authorization", "Bot "+d.token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	var responseAttr discordgo.Message
+	err = func() error {
+		defer func() {
+			err := recover()
+			if err != nil {
+				log.Println(err)
+			}
+		}()
+		return json.NewDecoder(resp.Body).Decode(&responseAttr)
+	}()
+	if err != nil {
+		return
+	}
+
+	return responseAttr, nil
+}
+
+func (d *DiscordReactionHandler) getMessages(channelID string, around string) (messages []discordgo.Message, err error) {
 	var requestAttr = make(url.Values)
 
 	requestAttr.Set("limit", "100")
+	if around != "" {
+		requestAttr.Set("around", around)
+	}
 
 	var client = http.DefaultClient
 	req, err := http.NewRequest(
@@ -219,6 +291,9 @@ func (d *DiscordReactionHandler) getMessages(channelID, timestamp string) (messa
 			err := recover()
 			if err != nil {
 				log.Println(err)
+				buf := new(bytes.Buffer)
+				io.Copy(buf, resp.Body)
+				fmt.Println(buf)
 			}
 		}()
 		return json.NewDecoder(resp.Body).Decode(&responseAttr)

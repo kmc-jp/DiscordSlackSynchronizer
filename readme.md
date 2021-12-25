@@ -135,6 +135,35 @@ LISTEN_ADDRESS=Listen addr
 STATE_DIRECTORY=/var/lib/...(例)
 ```
 
+## DiscordPrimaryPluginInterface
+
+メッセージの編集を、作成者のみが行えるように、Discordのメッセージ送信時、初期状態ではメッセージの送信者名の後に、Discordのユーザ番号を付加することで、メッセージの送信者情報を保持します。
+
+もし、利用するコミュニティに於いて、ユーザに対して一意に定まるユーザID(以下PrimaryID)が別に存在する場合、それを用いることもできます。
+
+次のようなインターフェイスを満たしたバイナリを、DiscordSlackSynchronizerの配置ディレクトリから見て、 `plugin/discord(.exe)` に置いておくことで、これを実現できます。
+
+1. 実行時に、プログラムに対し、次のような標準入力が与えられます。
+
+```
+MODE
+ID
+```
+
+ここで `MODE` と `ID` は次の組み合わせであたえられます。
+
+|MODE|ID|
+| --- | --- |
+|GetPrimaryID|探したいユーザのDiscordID|
+|GetDiscordID|探したいユーザのPrimaryID|
+
+2. プログラムはこれに対し、次のような標準出力を与える必要があります。
+
+|MODE|出力|
+| --- | --- |
+|GetPrimaryID|探したいユーザのPrimaryID|
+|GetDiscordID|PrimaryIDに対応するユーザが持つDiscordIDをカンマ区切りで表したもの|
+
 ## Copyright
 
 ### noto-emoji

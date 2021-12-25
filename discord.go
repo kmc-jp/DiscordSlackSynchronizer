@@ -15,6 +15,7 @@ import (
 )
 
 const DiscordAPIEndpoint = "https://discord.com/api"
+const SlackMessageDummyURI = "http://example?discord_message_ts="
 
 type DiscordHandler struct {
 	Session *discordgo.Session
@@ -315,6 +316,11 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	}
 
 	// TODO: create channel if not exist option
+
+	// append discord message id
+	if m.Message != nil {
+		content += fmt.Sprintf(" <%s%s|%s>", SlackMessageDummyURI, m.Message.Timestamp, "ㅤ")
+	}
 
 	var message = SlackHookMessage{
 		Channel:     sdt.SlackChannel,
