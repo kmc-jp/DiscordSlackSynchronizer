@@ -463,10 +463,6 @@ func (d *DiscordHandler) SendReactions(guildID, channelID, messageID string) err
 
 	for i, msg := range srcMessages {
 		if strings.Contains(msg.Text, "<"+SlackMessageDummyURI) {
-			if i == 0 {
-				continue
-			}
-
 			var sepMessage = strings.Split(msg.Text, "<"+SlackMessageDummyURI)
 			var messageTS = strings.Split(sepMessage[len(sepMessage)-1], "|")[0]
 
@@ -475,8 +471,8 @@ func (d *DiscordHandler) SendReactions(guildID, channelID, messageID string) err
 				continue
 			}
 
-			if dTime.UnixMilli() > srcT.UnixMilli() {
-				srcMessage = srcMessages[i-1]
+			if dTime.UnixMilli() >= srcT.UnixMilli() {
+				srcMessage = srcMessages[i]
 				check = true
 				break
 			}
