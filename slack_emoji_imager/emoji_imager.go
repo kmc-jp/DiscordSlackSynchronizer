@@ -314,7 +314,7 @@ func (s *Imager) MakeReactionsImage(channel string, timestamp string) (r io.Read
 			return nil, err
 		}
 
-		var encodeGIF = func(fromFrame, toFrame int) {
+		var setEmojiToImage = func(fromFrame, toFrame int) {
 			for frameNum := fromFrame; frameNum < toFrame; frameNum++ {
 				var frame = image.NewPaletted(image.Rect(0, 0, ImageWidth, ImageLaneHeight*((len(reactions)-1)/LaneReactionNum+1)), colorPalette)
 				frame = s.fillFrame(frame, color.White)
@@ -341,8 +341,8 @@ func (s *Imager) MakeReactionsImage(channel string, timestamp string) (r io.Read
 					}
 
 					var imgPoint = image.Point{
-						img.Bounds().Min.X + ReactionWidth*(j%LaneReactionNum) + ReactionMerginSize,
-						img.Bounds().Min.Y + ImageLaneHeight*(j/LaneReactionNum) + ReactionMerginSize,
+						img.Bounds().Min.X + ReactionWidth*(j%LaneReactionNum) + ReactionMerginSize + ReactionEmojiSize/2 - img.Bounds().Dx()/2,
+						img.Bounds().Min.Y + ImageLaneHeight*(j/LaneReactionNum) + ReactionMerginSize + ReactionEmojiSize/2 - img.Bounds().Dy()/2,
 					}
 
 					draw.Copy(frame, imgPoint, img, bound, draw.Over, nil)
@@ -373,8 +373,7 @@ func (s *Imager) MakeReactionsImage(channel string, timestamp string) (r io.Read
 			}
 		}
 
-		s.paralleExec(maxFrame, encodeGIF)
-
+		s.paralleExec(maxFrame, setEmojiToImage)
 	}
 
 	gifImage.Delay = make([]int, maxFrame)
