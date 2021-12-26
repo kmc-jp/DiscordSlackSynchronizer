@@ -58,18 +58,19 @@ func main() {
 		fmt.Println("Imager initialize error:", err)
 	}
 
+	if Tokens.Discord.API == "" {
+		fmt.Println("No discord token provided")
+		return
+	}
+
 	var DiscordWebhook = discord_webhook.New(Tokens.Discord.API)
 
 	var discordReactionHandler = NewDiscordReactionHandler(Tokens.Discord.API)
 	discordReactionHandler.SetReactionImager(imager)
 	discordReactionHandler.SetDiscordWebhook(DiscordWebhook)
 
-	if Tokens.Discord.API == "" {
-		fmt.Println("No discord token provided")
-		return
-	}
-
 	var slackWebhookHandler = slack_webhook.New(Tokens.Slack.API)
+	discordReactionHandler.SetMessageGetter(slackWebhookHandler)
 
 	Discord = NewDiscordBot(Tokens.Discord.API)
 	Discord.SetSlackWebhook(slackWebhookHandler)
@@ -86,12 +87,15 @@ func main() {
 	}()
 
 	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)
+
 	Slack.SetGyazoHandler(Gyazo)
 	Slack.SetReactionHandler(discordReactionHandler)
 	Slack.SetDiscordWebhook(DiscordWebhook)
+	Slack.SetSlackWebhook(slackWebhookHandler)
+	Slack.SetUserToken(Tokens.Slack.User)
+
 	go Slack.Do()
 
-	discordReactionHandler.SetMessageGetter(Slack)
 	discordReactionHandler.SetMessageEscaper(Slack)
 
 	var sockType = os.Getenv("SOCK_TYPE")

@@ -10,6 +10,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
+	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	scm "github.com/slack-go/slack/socketmode"
@@ -18,9 +20,10 @@ import (
 type SlackLastMessages map[string]string
 
 type SlackHandler struct {
-	api    *slack.Client
-	scm    *scm.Client
-	regExp struct {
+	api     *slack.Client
+	userAPI *slack.Client
+	scm     *scm.Client
+	regExp  struct {
 		UserID  *regexp.Regexp
 		Channel *regexp.Regexp
 		URI     *regexp.Regexp
@@ -31,9 +34,11 @@ type SlackHandler struct {
 	messageUnescaper *strings.Replacer
 
 	discordHook *discord_webhook.Handler
+	hook        *slack_webhook.Handler
 
 	apiToken   string
 	eventToken string
+	userToken  string
 
 	workspaceURI string
 
@@ -122,6 +127,15 @@ func (s *SlackHandler) SetReactionHandler(handler ReactionHandler) {
 
 func (s *SlackHandler) SetDiscordWebhook(hook *discord_webhook.Handler) {
 	s.discordHook = hook
+}
+
+func (s *SlackHandler) SetSlackWebhook(hook *slack_webhook.Handler) {
+	s.hook = hook
+}
+
+func (s *SlackHandler) SetUserToken(token string) {
+	s.userToken = token
+	s.userAPI = slack.New(token)
 }
 
 func (s *SlackHandler) reactionHandle(channel string, timestamp string) {
@@ -216,7 +230,29 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// Send by webhook
-	s.discordHook.Send(message.ChannelID, message.ID, message, []discord_webhook.File{})
+	newMessage, err := s.discordHook.Send(message.ChannelID, message.ID, message, true, nil)
+	if err != nil {
+		log.Println(errors.Wrap(err, "ResendingMessage: "))
+		return
+	}
+
+	if s.userAPI != nil {
+		_, _, err = s.userAPI.DeleteMessage(ev.Channel, ev.TimeStamp)
+		if err == nil {
+			var message = slack_webhook.Message{
+				IconURL:     user.Profile.ImageOriginal,
+				Username:    name,
+				Channel:     ev.Channel,
+				Text:        fmt.Sprintf("%s <%s%s|%s>", ev.Text, SlackMessageDummyURI, newMessage.Timestamp, "ㅤ"),
+				UnfurlLinks: true,
+				UnfurlMedia: true,
+				LinkNames:   true,
+			}
+
+			// Send message to Slack
+			s.hook.Send(message)
+		}
+	}
 
 	for _, f := range fileURL {
 		message = discord_webhook.Message{
@@ -229,7 +265,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 			},
 		}
 
-		s.discordHook.Send(message.ChannelID, message.ID, message, []discord_webhook.File{})
+		s.discordHook.Send(message.ChannelID, message.ID, message, false, nil)
 	}
 }
 
@@ -280,18 +316,4 @@ func (s *SlackHandler) EscapeMessage(content string) (output string, err error) 
 	}
 
 	return s.messageUnescaper.Replace(content), nil
-}
-
-func (s *SlackHandler) GetMessage(channelID, timestamp string) (string, error) {
-	res, err := s.api.GetConversationHistory(&slack.GetConversationHistoryParameters{
-		ChannelID: channelID,
-		Latest:    timestamp,
-		Limit:     1,
-		Inclusive: true,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	return res.Messages[0].Text, nil
 }

@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strconv"
 
+	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
 )
 
@@ -39,16 +42,13 @@ type Message struct {
 	IconEmoji string `json:"icon_emoji,omitempty"`
 }
 
-type BlockBase struct {
-	Type     string         `json:"type"`
-	Elements []BlockElement `json:"elements,omitempty"`
-}
-
-type BlockElement struct {
-	Type     string `json:"type"`
-	ImageURL string `json:"image_url,omitempty"`
-	AltText  string `json:"alt_text,omitempty"`
-	Text     string `json:"text,omitempty"`
+type GetConversationHistoryParameters struct {
+	ChannelID string `json:"channel"`
+	Cursor    string `json:"cursor,omitempty"`
+	Inclusive bool   `json:"inclusive,omitempty"`
+	Latest    string `json:"latest,omitempty"`
+	Limit     int    `json:"limit,omitempty"`
+	Oldest    string `json:"oldest,omitempty"`
 }
 
 func New(token string) *Handler {
@@ -119,4 +119,67 @@ func (s Handler) Remove(channel, ts string) (string, error) {
 	}
 	jsonDataBytes, _ := json.Marshal(removeMessage)
 	return s.send(jsonDataBytes, "delete")
+}
+
+func (s *Handler) GetMessages(channelID, timestamp string, limit int) ([]Message, error) {
+	var requestAttr = url.Values{}
+
+	requestAttr.Set("channel", channelID)
+	requestAttr.Set("latest", timestamp)
+	requestAttr.Set("limit", strconv.Itoa(limit))
+	requestAttr.Set("inclusive", "true")
+
+	msgs, err := s.getMessages(requestAttr.Encode())
+	if err != nil {
+		return nil, errors.Wrap(err, "getMessages")
+	}
+
+	return msgs, nil
+}
+
+func (s *Handler) GetMessage(channelID, timestamp string) (string, error) {
+	msgs, err := s.GetMessages(channelID, timestamp, 1)
+	if len(msgs) < 1 {
+		return "", errors.Wrap(err, "NotFound")
+	}
+	return msgs[0].Text, err
+}
+
+func (s *Handler) getMessages(query string) ([]Message, error) {
+	req, _ := http.NewRequest("GET", SlackAPIEndpoint+"/conversations.history?"+query, nil)
+
+	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("MessageSendError(Slack): %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("readall: %w", err)
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed send slack: body: %s", body)
+	}
+
+	var r struct {
+		OK       bool      `json:"ok"`
+		Messages []Message `json:"messages"`
+	}
+
+	err = json.Unmarshal(body, &r)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+	if !r.OK {
+		return nil, fmt.Errorf("failed send slack: body: %s", body)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return r.Messages, nil
 }

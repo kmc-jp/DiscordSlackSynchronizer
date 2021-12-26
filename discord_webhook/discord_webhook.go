@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pkg/errors"
 )
 
 const DiscordAPIEndpoint = "https://discord.com/api"
@@ -63,7 +64,7 @@ type Option struct {
 type Attachment struct {
 	URL         string `json:"url,omitempty"`
 	Description string `json:"description,omitempty"`
-	ID          int    `json:"id"`
+	ID          string `json:"id"`
 	ProxyURL    string `json:"proxy_url,omitempty"`
 	Filename    string `json:"filename,omitempty"`
 	Width       int    `json:"width,omitempty"`
@@ -178,11 +179,10 @@ func (h *Handler) createChannelWebhook(method, channelID, name string) (*discord
 	return &webhook, err
 }
 
-func (h *Handler) send(method, channelID, messageID string, message Message, files []File) (err error) {
+func (h *Handler) send(method, channelID, messageID string, message Message, wait bool, files []File) (newMessage *Message, err error) {
 	var hook = h.Get(channelID)
-
-	if err != nil {
-		return
+	if files == nil {
+		files = []File{}
 	}
 
 	var body = new(bytes.Buffer)
@@ -195,7 +195,7 @@ func (h *Handler) send(method, channelID, messageID string, message Message, fil
 
 	pw, err := mw.CreatePart(mh)
 	if err != nil {
-		return err
+		return nil, errors.Wrap(err, "CreatingPart")
 	}
 
 	b, err := json.MarshalIndent(message, "", "    ")
@@ -210,7 +210,7 @@ func (h *Handler) send(method, channelID, messageID string, message Message, fil
 
 		pw, err := mw.CreatePart(mh)
 		if err != nil {
-			return err
+			return nil, errors.Wrap(err, "CreatingPartAtFor")
 		}
 
 		io.Copy(pw, file.Reader)
@@ -229,11 +229,15 @@ func (h *Handler) send(method, channelID, messageID string, message Message, fil
 			body,
 		)
 	case "SEND":
+		var reqURI = fmt.Sprintf("%s/webhooks/%s/%s",
+			DiscordAPIEndpoint, hook.ID, hook.Token,
+		)
+		if wait {
+			reqURI += "?wait=true"
+		}
 		req, err = http.NewRequest(
 			"POST",
-			fmt.Sprintf("%s/webhooks/%s/%s",
-				DiscordAPIEndpoint, hook.ID, hook.Token,
-			),
+			reqURI,
 			body,
 		)
 	}
@@ -246,11 +250,28 @@ func (h *Handler) send(method, channelID, messageID string, message Message, fil
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return
+		return nil, errors.Wrap(err, "Sending")
 	}
 	defer resp.Body.Close()
 
-	return
+	var responseAttr Message
+
+	err = func() error {
+		defer func() {
+			dErr := recover()
+			if dErr != nil {
+				log.Println(err)
+			}
+		}()
+
+		return json.NewDecoder(resp.Body).Decode(&responseAttr)
+	}()
+
+	if err != nil {
+		return nil, errors.Wrap(err, "JsonParsing")
+	}
+
+	return &responseAttr, nil
 }
 
 func (h *Handler) Get(channelID string) *discordgo.Webhook {
@@ -271,15 +292,15 @@ func (h *Handler) Get(channelID string) *discordgo.Webhook {
 	return webhook
 }
 
-func (h *Handler) Edit(channelID, messageID string, message Message, files []File) (err error) {
-	return h.send("EDIT", channelID, messageID, message, files)
+func (h *Handler) Edit(channelID, messageID string, message Message, files []File) (*Message, error) {
+	return h.send("EDIT", channelID, messageID, message, false, files)
 }
 
-func (h *Handler) Send(channelID, messageID string, message Message, files []File) (err error) {
-	return h.send("SEND", channelID, messageID, message, files)
+func (h *Handler) Send(channelID, messageID string, message Message, wait bool, files []File) (*Message, error) {
+	return h.send("SEND", channelID, messageID, message, wait, files)
 }
 
-func (h *Handler) GetMessage(channelID, messageID string) (messages discordgo.Message, err error) {
+func (h *Handler) GetMessage(channelID, messageID string) (message discordgo.Message, err error) {
 	var requestAttr = make(url.Values)
 
 	var client = http.DefaultClient

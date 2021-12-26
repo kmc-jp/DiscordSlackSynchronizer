@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
 
@@ -142,14 +141,9 @@ next:
 			continue
 		}
 
-		id, err := strconv.Atoi(oldAtt.ID)
-		if err != nil {
-			continue
-		}
-
 		message.Attachments = append(message.Attachments, discord_webhook.Attachment{
 			URL:      oldAtt.URL,
-			ID:       id,
+			ID:       oldAtt.ID,
 			ProxyURL: oldAtt.ProxyURL,
 			Filename: oldAtt.Filename,
 			Width:    oldAtt.Width,
@@ -160,7 +154,8 @@ next:
 	}
 
 	if zeroReaction {
-		return d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{})
+		_, err = d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{})
+		return err
 	}
 
 	var file = discord_webhook.File{
@@ -169,7 +164,8 @@ next:
 		ContentType: "image/gif",
 	}
 
-	return d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{file})
+	_, err = d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{file})
+	return err
 }
 
 func (d *DiscordReactionHandler) AddEmoji(name, value string) {

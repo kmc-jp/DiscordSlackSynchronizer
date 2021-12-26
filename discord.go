@@ -5,12 +5,13 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	dp "github.com/kmc-jp/DiscordSlackSynchronizer/discord_plugin"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_block_maker"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
@@ -55,6 +56,9 @@ func NewDiscordBot(apiToken string) *DiscordHandler {
 
 	dg.AddHandler(d.voiceState)
 	dg.AddHandler(d.watch)
+	dg.AddHandler(d.ReactionAdd)
+	dg.AddHandler(d.ReactionRemove)
+	dg.AddHandler(d.ReactionRemoveAll)
 
 	d.slackLastMessages = SlackLastMessages{}
 
@@ -145,14 +149,9 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 
 				var oldAtt = message.Message.Attachments[i]
 
-				id, err := strconv.Atoi(oldAtt.ID)
-				if err != nil {
-					continue
-				}
-
 				message.Attachments = append(message.Attachments, discord_webhook.Attachment{
 					URL:      oldAtt.URL,
-					ID:       id,
+					ID:       oldAtt.ID,
 					ProxyURL: oldAtt.ProxyURL,
 					Filename: oldAtt.Filename,
 					Width:    oldAtt.Width,
@@ -206,7 +205,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 			}
 
 			message.Content = newContent
-			err = d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{})
+			_, err = d.hook.Edit(message.ChannelID, message.ID, message, []discord_webhook.File{})
 			if err != nil {
 				log.Printf("EditError: %s\n", err)
 				return
@@ -262,7 +261,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		log.Println(err)
 	} else {
 		// if it was successed, send message by webhook
-		d.hook.Send(m.ChannelID, m.ID, dMessage, []discord_webhook.File{})
+		d.hook.Send(m.ChannelID, m.ID, dMessage, false, nil)
 	}
 
 	var imageURIs = []string{}
@@ -412,6 +411,99 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 			d.sendVoiceState(setting, channels, VoiceStateChanged)
 		}
 	}
+}
+
+func (d *DiscordHandler) ReactionAdd(_ *discordgo.Session, ev *discordgo.MessageReactionAdd) {
+	err := d.SendReactions(ev.GuildID, ev.ChannelID, ev.MessageID)
+	if err != nil {
+		log.Println(err)
+	}
+}
+func (d *DiscordHandler) ReactionRemove(_ *discordgo.Session, ev *discordgo.MessageReactionRemove) {
+	err := d.SendReactions(ev.GuildID, ev.ChannelID, ev.MessageID)
+	if err != nil {
+		log.Println(err)
+	}
+}
+func (d *DiscordHandler) ReactionRemoveAll(_ *discordgo.Session, ev *discordgo.MessageReactionRemoveAll) {
+	err := d.SendReactions(ev.GuildID, ev.ChannelID, ev.MessageID)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func (d *DiscordHandler) SendReactions(guildID, channelID, messageID string) error {
+	var sdt = findSlackChannel(channelID, guildID)
+	if sdt.SlackChannel == "" {
+		return nil
+	}
+
+	//Confirm Discord to Slack
+	if !sdt.Setting.DiscordToSlack {
+		return nil
+	}
+
+	message, err := d.hook.GetMessage(channelID, messageID)
+	if err != nil {
+		return errors.Wrap(err, "GetDiscordMessage")
+	}
+
+	srcMessages, err := d.slackWebhook.GetMessages(sdt.SlackChannel, "", 100)
+	if err != nil {
+		return errors.Wrap(err, "GetSlackMessages")
+	}
+
+	var srcMessage slack_webhook.Message
+	var check bool
+
+	dTime, err := message.Timestamp.Parse()
+	if err != nil {
+		return errors.Wrap(err, "ParseDiscordTS")
+	}
+
+	for i, msg := range srcMessages {
+		if strings.Contains(msg.Text, "<"+SlackMessageDummyURI) {
+			if i == 0 {
+				continue
+			}
+
+			var sepMessage = strings.Split(msg.Text, "<"+SlackMessageDummyURI)
+			var messageTS = strings.Split(sepMessage[len(sepMessage)-1], "|")[0]
+
+			srcT, err := time.Parse(time.RFC3339, messageTS)
+			if err != nil {
+				continue
+			}
+
+			if dTime.UnixMilli() > srcT.UnixMilli() {
+				srcMessage = srcMessages[i-1]
+				check = true
+				break
+			}
+		}
+	}
+	if !check {
+		return fmt.Errorf("MessageNotFound")
+	}
+
+	var blocks = slack_emoji_block_maker.Build(message.Reactions)
+
+	var textBlock = slack_webhook.BlockBase{
+		Type: "section",
+		Text: slack_webhook.BlockElement{
+			Type: "mrkdwn", Text: srcMessage.Text,
+		},
+	}
+
+	srcMessage.Blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
+	srcMessage.Channel = sdt.SlackChannel
+
+	_, err = d.slackWebhook.Update(srcMessage)
+	if err != nil {
+		return errors.Wrap(err, "UpdateMessage")
+	}
+
+	return nil
 }
 
 func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceChannels, event VoiceEvent) {
