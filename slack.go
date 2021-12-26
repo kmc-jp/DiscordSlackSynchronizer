@@ -15,6 +15,8 @@ import (
 	scm "github.com/slack-go/slack/socketmode"
 )
 
+type SlackLastMessages map[string]string
+
 type SlackHandler struct {
 	api    *slack.Client
 	scm    *scm.Client
