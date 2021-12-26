@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"net/url"
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
@@ -275,4 +277,88 @@ func (h *Handler) Edit(channelID, messageID string, message Message, files []Fil
 
 func (h *Handler) Send(channelID, messageID string, message Message, files []File) (err error) {
 	return h.send("SEND", channelID, messageID, message, files)
+}
+
+func (h *Handler) GetMessage(channelID, messageID string) (messages discordgo.Message, err error) {
+	var requestAttr = make(url.Values)
+
+	var client = http.DefaultClient
+	req, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("%s/channels/%s/messages/%s?%s", DiscordAPIEndpoint, channelID, messageID, requestAttr.Encode()),
+		nil,
+	)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Authorization", "Bot "+h.token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	var responseAttr discordgo.Message
+	err = func() error {
+		defer func() {
+			err := recover()
+			if err != nil {
+				log.Println(err)
+			}
+		}()
+		return json.NewDecoder(resp.Body).Decode(&responseAttr)
+	}()
+	if err != nil {
+		return
+	}
+
+	return responseAttr, nil
+}
+
+func (h *Handler) GetMessages(channelID string, around string) (messages []discordgo.Message, err error) {
+	var requestAttr = make(url.Values)
+
+	requestAttr.Set("limit", "100")
+	if around != "" {
+		requestAttr.Set("around", around)
+	}
+
+	var client = http.DefaultClient
+	req, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("%s/channels/%s/messages?%s", DiscordAPIEndpoint, channelID, requestAttr.Encode()),
+		nil,
+	)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Authorization", "Bot "+h.token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	var responseAttr []discordgo.Message
+	err = func() error {
+		defer func() {
+			err := recover()
+			if err != nil {
+				log.Println(err)
+				buf := new(bytes.Buffer)
+				io.Copy(buf, resp.Body)
+				fmt.Println(buf)
+			}
+		}()
+		return json.NewDecoder(resp.Body).Decode(&responseAttr)
+	}()
+	if err != nil {
+		return
+	}
+
+	return responseAttr, nil
 }
