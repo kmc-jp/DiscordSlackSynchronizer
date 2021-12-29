@@ -34,5 +34,12 @@ func (b BlockBase) MarshalJSON() ([]byte, error) {
 		return json.Marshal(baseElem{b.Type, b.Elements})
 	}
 
+	if b.Type != "" {
+		type base struct {
+			Type string `json:"type"`
+		}
+		return json.Marshal(base{b.Type})
+	}
+
 	return nil, fmt.Errorf("IlligalFormat")
 }
