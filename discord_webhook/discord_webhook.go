@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -256,6 +257,7 @@ func (h *Handler) send(method, channelID, messageID string, message Message, wai
 
 	var responseAttr Message
 
+	var buf []byte
 	err = func() error {
 		defer func() {
 			dErr := recover()
@@ -264,14 +266,15 @@ func (h *Handler) send(method, channelID, messageID string, message Message, wai
 			}
 		}()
 
-		return json.NewDecoder(resp.Body).Decode(&responseAttr)
+		buf, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return errors.Wrap(err, "ReadResponseBody")
+		}
+
+		return json.Unmarshal(buf, &responseAttr)
 	}()
 
-	if err != nil {
-		return nil, errors.Wrap(err, "JsonParsing")
-	}
-
-	return &responseAttr, nil
+	return &responseAttr, errors.Wrapf(err, "JsonParsing\n%s", buf)
 }
 
 func (h *Handler) Get(channelID string) *discordgo.Webhook {

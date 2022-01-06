@@ -9,6 +9,9 @@ type BlockBase struct {
 	Type     string         `json:"type"`
 	Text     BlockElement   `json:"text,omitempty"`
 	Elements []BlockElement `json:"elements,omitempty"`
+	ImageURL string         `json:"image_url"`
+	AltText  string         `json:"alt_text"`
+	Title    BlockTitle     `json:"title"`
 }
 
 type BlockElement struct {
@@ -18,7 +21,46 @@ type BlockElement struct {
 	Text     string `json:"text,omitempty"`
 }
 
+type BlockTitle struct {
+	Type  string `json:"type,omitempty"`
+	Text  string `json:"text,omitempty"`
+	Emoji bool   `json:"emoji,omitempty"`
+}
+
+func ImageBlock(url, altText string) BlockBase {
+	return BlockBase{
+		Type:     "image",
+		AltText:  altText,
+		ImageURL: url,
+	}
+}
+
+func ImageTitle(title string, emoji bool) BlockTitle {
+	return BlockTitle{
+		Type:  "plain_text",
+		Emoji: emoji,
+		Text:  title,
+	}
+}
+
 func (b BlockBase) MarshalJSON() ([]byte, error) {
+	if b.Type == "image" {
+		if b.Title.Type != "" {
+			type baseImage struct {
+				Type     string     `json:"type"`
+				ImageURL string     `json:"image_url"`
+				AltText  string     `json:"alt_text"`
+				Title    BlockTitle `json:"title"`
+			}
+			return json.Marshal(baseImage{b.Type, b.ImageURL, b.AltText, b.Title})
+		}
+		type baseImage struct {
+			Type     string `json:"type"`
+			ImageURL string `json:"image_url"`
+			AltText  string `json:"alt_text"`
+		}
+		return json.Marshal(baseImage{b.Type, b.ImageURL, b.AltText})
+	}
 	if b.Text.Type != "" {
 		type baseText struct {
 			Type string       `json:"type"`

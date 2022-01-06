@@ -14,7 +14,6 @@ import (
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_block_maker"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
-	"github.com/slack-go/slack"
 )
 
 const DiscordAPIEndpoint = "https://discord.com/api"
@@ -238,6 +237,22 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		},
 	}
 
+	if m.Message != nil {
+		if m.Message.Attachments != nil {
+			for i := range m.Message.Attachments {
+				if m.Message.Attachments[i] == nil {
+					continue
+				}
+
+				dMessage.Content += fmt.Sprintf("%s\n", m.Message.Attachments[i].URL)
+			}
+		}
+
+		if m.Embeds != nil {
+			dMessage.Embeds = m.Embeds
+		}
+	}
+
 	if reference != nil {
 		var refText string
 		var refSlice = strings.Split(reference.Content, "\n")
@@ -265,16 +280,19 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	}
 
 	var imageURIs = []string{}
+	var imageTitles = []string{}
+
 	var fileURL string
-	for _, f := range m.Attachments {
-		if d.regExp.ImageURI.MatchString(f.URL) {
-			imageURIs = append(imageURIs, f.URL)
+	for _, attach := range m.Attachments {
+		if d.regExp.ImageURI.MatchString(attach.URL) {
+			imageURIs = append(imageURIs, attach.URL)
+			imageTitles = append(imageTitles, attach.Filename)
 		} else {
-			fileURL += "\n" + f.URL
+			fileURL += "\n" + attach.URL
 		}
 	}
 
-	var content = dMessage.Content
+	var content = m.Content
 
 	for _, id := range d.regExp.UserID.FindAllStringSubmatch(content, -1) {
 		if len(id) < 2 {
@@ -323,12 +341,12 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		content = content + fileURL
 	}
 
-	var attachments = []slack.Attachment{}
-	for _, imageURI := range imageURIs {
-		var attachment slack.Attachment
-
-		attachment.ImageURL = imageURI
-		attachments = append(attachments, attachment)
+	var blocks = []slack_webhook.BlockBase{}
+	for i, imageURI := range imageURIs {
+		var title = imageTitles[i]
+		var block = slack_webhook.ImageBlock(imageURI, title)
+		block.Title = slack_webhook.ImageTitle(title, false)
+		blocks = append(blocks, block)
 	}
 
 	// TODO: create channel if not exist option
@@ -343,7 +361,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		Username:    name,
 		Channel:     sdt.SlackChannel,
 		Text:        content,
-		Attachments: attachments,
+		Blocks:      blocks,
 		UnfurlLinks: true,
 		UnfurlMedia: true,
 		LinkNames:   true,
