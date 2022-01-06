@@ -237,14 +237,28 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		},
 	}
 
+	var dFiles = []discord_webhook.File{}
+
 	if m.Message != nil {
 		if m.Message.Attachments != nil {
 			for i := range m.Message.Attachments {
+				var file discord_webhook.File
+
 				if m.Message.Attachments[i] == nil {
 					continue
 				}
 
-				dMessage.Content += fmt.Sprintf("%s\n", m.Message.Attachments[i].URL)
+				resp, err := http.Get(m.Message.Attachments[i].URL)
+				if err != nil {
+					log.Printf("DownloadErr: %s\n", err.Error())
+					continue
+				}
+				defer resp.Body.Close()
+
+				file.Reader = resp.Body
+				file.FileName = m.Message.Attachments[i].Filename
+
+				dFiles = append(dFiles, file)
 			}
 		}
 
@@ -276,14 +290,19 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		log.Println(err)
 	} else {
 		// if it was successed, send message by webhook
-		d.hook.Send(m.ChannelID, m.ID, dMessage, false, nil)
+		message, err := d.hook.Send(m.ChannelID, m.ID, dMessage, false, dFiles)
+		if err != nil {
+			log.Printf("MessageSendError: %s", err)
+		}
+
+		dMessage = *message
 	}
 
 	var imageURIs = []string{}
 	var imageTitles = []string{}
 
 	var fileURL string
-	for _, attach := range m.Attachments {
+	for _, attach := range dMessage.Attachments {
 		if d.regExp.ImageURI.MatchString(attach.URL) {
 			imageURIs = append(imageURIs, attach.URL)
 			imageTitles = append(imageTitles, attach.Filename)
