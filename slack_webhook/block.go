@@ -102,9 +102,7 @@ func (b BlockBase) MarshalJSON() ([]byte, error) {
 			Elements []BlockElement `json:"elements,omitempty"`
 		}
 		return json.Marshal(baseElem{b.Type, b.Elements})
-	}
-
-	if b.Text.Type != "" {
+	case "section":
 		type baseText struct {
 			Type string       `json:"type"`
 			Text BlockElement `json:"text,omitempty"`
