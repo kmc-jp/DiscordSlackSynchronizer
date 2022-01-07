@@ -62,10 +62,15 @@ chat:write.customize
 chat:write.public
 
 files:read
+files:write
+
+emoji:read
 
 groups:history
-
 groups:read
+
+reactions:read
+remote_files:write
 
 users.profile:read
 users:read
