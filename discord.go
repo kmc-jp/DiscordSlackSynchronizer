@@ -241,12 +241,13 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 
 	if m.Message != nil {
 		if m.Message.Attachments != nil {
+			// Add original attachments to new message
 			for i := range m.Message.Attachments {
-				var file discord_webhook.File
-
 				if m.Message.Attachments[i] == nil {
 					continue
 				}
+
+				var dfile discord_webhook.File
 
 				resp, err := http.Get(m.Message.Attachments[i].URL)
 				if err != nil {
@@ -255,10 +256,9 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 				}
 				defer resp.Body.Close()
 
-				file.Reader = resp.Body
-				file.FileName = m.Message.Attachments[i].Filename
-
-				dFiles = append(dFiles, file)
+				dfile.Reader = resp.Body
+				dfile.FileName = m.Message.Attachments[i].Filename
+				dFiles = append(dFiles, dfile)
 			}
 		}
 
@@ -268,6 +268,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	}
 
 	if reference != nil {
+		// if sent text has reference, add its first line text to message
 		var refText string
 		var refSlice = strings.Split(reference.Content, "\n")
 		if len(refSlice) > 1 {
@@ -301,13 +302,33 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	var imageURIs = []string{}
 	var imageTitles = []string{}
 
-	var fileURL string
+	var fileBlocks = []slack_webhook.BlockBase{}
+
 	for _, attach := range dMessage.Attachments {
 		if d.regExp.ImageURI.MatchString(attach.URL) {
+			// image like png, gif, jpeg
 			imageURIs = append(imageURIs, attach.URL)
 			imageTitles = append(imageTitles, attach.Filename)
 		} else {
-			fileURL += "\n" + attach.URL
+			if attach.URL != "" {
+				// add rich file link to the slack message
+				var externalID = fmt.Sprintf("DiscordSlackSync:%s/%s", m.GuildID, attach.ID)
+
+				_, err := d.slackWebhook.FilesRemoteAdd(
+					slack_webhook.FilesRemoteAddParameters{
+						FileType:    slack_webhook.FindFileType(attach.Filename),
+						ExternalURL: attach.URL,
+						Title:       attach.Filename,
+						ExternalID:  externalID,
+					},
+				)
+				if err != nil {
+					log.Printf("SlackFileRemoteAddAPIError: %s", err.Error())
+					continue
+				}
+
+				fileBlocks = append(fileBlocks, slack_webhook.FileBlock(externalID))
+			}
 		}
 	}
 
@@ -355,9 +376,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 			fmt.Printf("%s\n", err.Error())
 			return
 		}
-		content = "`#" + channelData.Name + "` " + content + fileURL
-	} else {
-		content = content + fileURL
+		content = "`#" + channelData.Name + "` " + content
 	}
 
 	var blocks = []slack_webhook.BlockBase{}
@@ -368,11 +387,18 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		blocks = append(blocks, block)
 	}
 
+	blocks = append(blocks, fileBlocks...)
+
 	// TODO: create channel if not exist option
 
 	// append discord message id
 	if m.Message != nil {
 		content += fmt.Sprintf(" <%s%s|%s>", SlackMessageDummyURI, m.Message.Timestamp, "ㅤ")
+	}
+
+	if len(blocks) > 0 {
+		var textBlock = slack_webhook.ContextBlock(slack_webhook.MrkdwnElement(content))
+		blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
 	}
 
 	var message = slack_webhook.Message{
@@ -387,7 +413,12 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	}
 
 	// Send message to Slack
-	d.slackWebhook.Send(message)
+	_, err = d.slackWebhook.Send(message)
+	if err != nil {
+		log.Printf("ErrorInSendingMessageToSlack: %s\n", err.Error())
+		return
+	}
+
 }
 
 type VoiceEvent int
@@ -526,13 +557,12 @@ func (d *DiscordHandler) SendReactions(guildID, channelID, messageID string) err
 
 	for _, block := range srcMessage.Blocks {
 		switch block.Type {
-		case "image":
+		case "image", "file":
 			blocks = append([]slack_webhook.BlockBase{block}, blocks...)
 		}
 	}
 
 	srcMessage.Blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
-
 	srcMessage.Channel = sdt.SlackChannel
 
 	_, err = d.slackWebhook.Update(srcMessage)

@@ -6,12 +6,14 @@ import (
 )
 
 type BlockBase struct {
-	Type     string         `json:"type"`
-	Text     BlockElement   `json:"text,omitempty"`
-	Elements []BlockElement `json:"elements,omitempty"`
-	ImageURL string         `json:"image_url"`
-	AltText  string         `json:"alt_text"`
-	Title    BlockTitle     `json:"title"`
+	Type       string         `json:"type"`
+	Text       BlockElement   `json:"text,omitempty"`
+	Elements   []BlockElement `json:"elements,omitempty"`
+	ImageURL   string         `json:"image_url"`
+	AltText    string         `json:"alt_text"`
+	Title      BlockTitle     `json:"title"`
+	ExternalID string         `json:"external_id"`
+	Source     string         `json:"source"`
 }
 
 type BlockElement struct {
@@ -70,6 +72,14 @@ func SectionBlock() BlockBase {
 	return BlockBase{Type: "section"}
 }
 
+func FileBlock(ExternalID string) BlockBase {
+	return BlockBase{
+		Type:       "file",
+		Source:     "remote",
+		ExternalID: ExternalID,
+	}
+}
+
 func (b BlockBase) MarshalJSON() ([]byte, error) {
 	switch b.Type {
 	case "image":
@@ -108,6 +118,13 @@ func (b BlockBase) MarshalJSON() ([]byte, error) {
 			Text BlockElement `json:"text,omitempty"`
 		}
 		return json.Marshal(baseText{b.Type, b.Text})
+	case "file":
+		type base struct {
+			Type       string `json:"type"`
+			ExternalID string `json:"external_id"`
+			Source     string `json:"source"`
+		}
+		return json.Marshal(base{b.Type, b.ExternalID, b.Source})
 	}
 
 	return nil, fmt.Errorf("IlligalFormat")

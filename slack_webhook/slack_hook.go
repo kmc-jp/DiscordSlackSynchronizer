@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
@@ -86,6 +90,41 @@ type GetConversationHistoryParameters struct {
 	Latest    string `json:"latest,omitempty"`
 	Limit     int    `json:"limit,omitempty"`
 	Oldest    string `json:"oldest,omitempty"`
+}
+
+type FilesRemoteAddParameters struct {
+	Title                 string
+	FileType              string
+	ExternalID            string
+	ExternalURL           string
+	IndexableFileContents io.Reader
+	PreviewImage          io.Reader
+	File                  io.Reader
+}
+
+type File struct {
+	FileName        string
+	Reader          io.Reader
+	FileType        string
+	InitialComment  string
+	ThreadTimestamp string
+}
+
+type UnfURLs map[string]UnfURL
+
+type UnfURLsParameters struct {
+	Channel          string      `json:"channel"`
+	TimeStamp        string      `json:"ts"`
+	UnfURLs          UnfURLs     `json:"unfurls"`
+	Source           string      `json:"source,omitempty"`
+	UnfUrlID         string      `json:"unfurl_id,omitempty"`
+	UserAuthBlocks   []BlockBase `json:"user_auth_blocks,omitempty"`
+	UserAuthRequired bool        `json:"user_auth_required,omitempty"`
+}
+
+type UnfURL struct {
+	HideColor bool        `json:"hide_color"`
+	Blocks    []BlockBase `json:"blocks"`
 }
 
 func New(token string) *Handler {
@@ -219,4 +258,255 @@ func (s *Handler) getMessages(query string) ([]Message, error) {
 	}
 
 	return r.Messages, nil
+}
+
+func (s *Handler) FilesUpload(file File, channels ...string) (*slack.File, error) {
+	var body = new(bytes.Buffer)
+
+	var mw = multipart.NewWriter(body)
+
+	if file.FileName != "" {
+		pw, err := mw.CreateFormField("filename")
+		if err != nil {
+			return nil, errors.Wrap(err, "CreatingPartAtFileName")
+		}
+
+		pw.Write([]byte(file.FileName))
+	}
+
+	if file.FileType != "" {
+		pw, err := mw.CreateFormField("filetype")
+		if err != nil {
+			return nil, errors.Wrap(err, "CreatingPartAtFileType")
+		}
+
+		pw.Write([]byte(file.FileType))
+	}
+
+	if file.InitialComment != "" {
+		pw, err := mw.CreateFormField("initial_comment")
+		if err != nil {
+			return nil, errors.Wrap(err, "CreatingPartAtInitialComment")
+		}
+
+		pw.Write([]byte(file.InitialComment))
+	}
+
+	if len(channels) > 0 {
+		pw, err := mw.CreateFormField("channels")
+		if err != nil {
+			return nil, errors.Wrap(err, "CreatingPartAtInitialComment")
+		}
+
+		pw.Write([]byte(strings.Join(channels, ",")))
+	}
+
+	if file.ThreadTimestamp != "" {
+		pw, err := mw.CreateFormField("thread_ts")
+		if err != nil {
+			return nil, errors.Wrap(err, "CreatingPartAtThreadTimestamp")
+		}
+
+		pw.Write([]byte(file.ThreadTimestamp))
+	}
+
+	pw, err := mw.CreateFormField("content")
+	if err != nil {
+		return nil, errors.Wrap(err, "CreatingPartAtFile")
+	}
+
+	io.Copy(pw, file.Reader)
+
+	mw.Close()
+
+	var req *http.Request
+	var reqURI = fmt.Sprintf("%s/files.upload", SlackAPIEndpoint)
+
+	req, err = http.NewRequest("POST", reqURI, body)
+	if err != nil {
+		return nil, errors.Wrap(err, "Requrst")
+	}
+
+	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "Sending")
+	}
+	defer resp.Body.Close()
+
+	type responseAttrType struct {
+		OK    bool       `json:"ok"`
+		Error string     `json:"error"`
+		File  slack.File `json:"file"`
+	}
+
+	var responseAttr responseAttrType
+
+	err = func() error {
+		defer func() {
+			err := recover()
+			if err != nil {
+				log.Printf("Panic in Decoding JSON: %v\n", err)
+			}
+		}()
+		return json.NewDecoder(resp.Body).Decode(&responseAttr)
+	}()
+
+	if err != nil {
+		return &responseAttr.File, errors.Wrap(err, "DecodingJSON")
+	}
+
+	if !responseAttr.OK {
+		return &responseAttr.File, errors.New("SlackAPIError: " + responseAttr.Error)
+	}
+
+	return &responseAttr.File, nil
+}
+
+func (s *Handler) FilesRemoteAdd(file FilesRemoteAddParameters) (*slack.File, error) {
+	var body = new(bytes.Buffer)
+
+	var mw = multipart.NewWriter(body)
+
+	pw, err := mw.CreateFormField("external_id")
+	if err != nil {
+		return nil, errors.Wrap(err, "CreatingPartAtExternalID")
+	}
+
+	pw.Write([]byte(file.ExternalID))
+
+	pw, err = mw.CreateFormField("external_url")
+	if err != nil {
+		return nil, errors.Wrap(err, "CreatingPartAtExternalURL")
+	}
+
+	pw.Write([]byte(file.ExternalURL))
+
+	pw, err = mw.CreateFormField("title")
+	if err != nil {
+		return nil, errors.Wrap(err, "CreatingPartAtInitialComment")
+	}
+
+	pw.Write([]byte(file.Title))
+
+	if file.FileType != "" {
+		pw, err := mw.CreateFormField("filetype")
+		if err != nil {
+			return nil, errors.Wrap(err, "CreatingPartAtFileType")
+		}
+
+		pw.Write([]byte(file.FileType))
+	}
+
+	if file.IndexableFileContents != nil {
+		pw, err := mw.CreateFormField("indexable_file_contents")
+		if err != nil {
+			return nil, errors.Wrap(err, "CreatingPartAtIndexableFileContents")
+		}
+
+		io.Copy(pw, file.IndexableFileContents)
+	}
+
+	if file.PreviewImage != nil {
+		pw, err := mw.CreateFormField("preview_image")
+		if err != nil {
+			return nil, errors.Wrap(err, "CreatingPartAtPreviewImage")
+		}
+
+		io.Copy(pw, file.PreviewImage)
+	}
+	mw.Close()
+
+	var req *http.Request
+	var reqURI = fmt.Sprintf("%s/files.remote.add", SlackAPIEndpoint)
+
+	req, err = http.NewRequest("POST", reqURI, body)
+	if err != nil {
+		return nil, errors.Wrap(err, "Requrst")
+	}
+
+	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "Sending")
+	}
+	defer resp.Body.Close()
+
+	var responseAttr struct {
+		OK    bool       `json:"ok"`
+		Error string     `json:"error"`
+		File  slack.File `json:"file"`
+	}
+
+	err = func() error {
+		defer func() {
+			err := recover()
+			if err != nil {
+				log.Printf("Panic in Decoding JSON: %v\n", err)
+			}
+		}()
+		return json.NewDecoder(resp.Body).Decode(&responseAttr)
+	}()
+
+	if err != nil {
+		return &responseAttr.File, errors.Wrap(err, "DecodingJSON")
+	}
+
+	if !responseAttr.OK {
+		return &responseAttr.File, errors.New("SlackAPIError: " + responseAttr.Error)
+	}
+
+	return &responseAttr.File, nil
+}
+
+func (s *Handler) ChatUnfURL(parameters UnfURLsParameters) error {
+	var body = new(bytes.Buffer)
+	err := json.NewEncoder(body).Encode(parameters)
+	if err != nil {
+		return errors.Wrap(err, "JsonEncode")
+	}
+
+	var reqURI = fmt.Sprintf("%s/chat.unfurl", SlackAPIEndpoint)
+	req, err := http.NewRequest("POST", reqURI, body)
+	if err != nil {
+		return errors.Wrap(err, "Requrst")
+	}
+
+	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "Request")
+	}
+
+	type responseAttrType struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+
+	var responseAttr responseAttrType
+	err = func() error {
+		defer func() {
+			err := recover()
+			if err != nil {
+				log.Printf("Error At Json Decoding: %v", err)
+			}
+		}()
+		return json.NewDecoder(resp.Body).Decode(&responseAttr)
+	}()
+
+	if err != nil {
+		return errors.Wrap(err, "JsonDecode")
+	}
+
+	if !responseAttr.OK {
+		return errors.New(fmt.Sprintf("ErrorAtUnfurlAPI: %s", responseAttr.Error))
+	}
+
+	return nil
 }
