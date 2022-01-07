@@ -27,11 +27,11 @@ type BlockTitle struct {
 	Emoji bool   `json:"emoji,omitempty"`
 }
 
-func ImageBlock(url, altText string) BlockBase {
+func ImageBlock(imageURL, altText string) BlockBase {
 	return BlockBase{
 		Type:     "image",
 		AltText:  altText,
-		ImageURL: url,
+		ImageURL: imageURL,
 	}
 }
 
@@ -43,9 +43,38 @@ func ImageTitle(title string, emoji bool) BlockTitle {
 	}
 }
 
+func MrkdwnElement(text string) BlockElement {
+	return BlockElement{Type: "mrkdwn", Text: text}
+}
+
+func ImageElement(imageURL, altText string) BlockElement {
+	return BlockElement{
+		Type:     "image",
+		ImageURL: imageURL,
+		AltText:  altText,
+	}
+}
+
+func ContextBlock(elements ...BlockElement) BlockBase {
+	return BlockBase{
+		Type:     "context",
+		Elements: elements,
+	}
+}
+
+func DividerBlock() BlockBase {
+	return BlockBase{Type: "divider"}
+}
+
+func SectionBlock() BlockBase {
+	return BlockBase{Type: "section"}
+}
+
 func (b BlockBase) MarshalJSON() ([]byte, error) {
-	if b.Type == "image" {
+	switch b.Type {
+	case "image":
 		if b.Title.Type != "" {
+			// image has title object
 			type baseImage struct {
 				Type     string     `json:"type"`
 				ImageURL string     `json:"image_url"`
@@ -54,21 +83,20 @@ func (b BlockBase) MarshalJSON() ([]byte, error) {
 			}
 			return json.Marshal(baseImage{b.Type, b.ImageURL, b.AltText, b.Title})
 		}
+
+		// no title object
 		type baseImage struct {
 			Type     string `json:"type"`
 			ImageURL string `json:"image_url"`
 			AltText  string `json:"alt_text"`
 		}
 		return json.Marshal(baseImage{b.Type, b.ImageURL, b.AltText})
-	}
-	if b.Text.Type != "" {
-		type baseText struct {
-			Type string       `json:"type"`
-			Text BlockElement `json:"text,omitempty"`
+	case "divider":
+		type base struct {
+			Type string `json:"type"`
 		}
-		return json.Marshal(baseText{b.Type, b.Text})
-	}
-	if len(b.Elements) > 0 {
+		return json.Marshal(base{"divider"})
+	case "context":
 		type baseElem struct {
 			Type     string         `json:"type"`
 			Elements []BlockElement `json:"elements,omitempty"`
@@ -76,11 +104,12 @@ func (b BlockBase) MarshalJSON() ([]byte, error) {
 		return json.Marshal(baseElem{b.Type, b.Elements})
 	}
 
-	if b.Type != "" {
-		type base struct {
-			Type string `json:"type"`
+	if b.Text.Type != "" {
+		type baseText struct {
+			Type string       `json:"type"`
+			Text BlockElement `json:"text,omitempty"`
 		}
-		return json.Marshal(base{b.Type})
+		return json.Marshal(baseText{b.Type, b.Text})
 	}
 
 	return nil, fmt.Errorf("IlligalFormat")

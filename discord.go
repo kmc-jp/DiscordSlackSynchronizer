@@ -521,14 +521,19 @@ func (d *DiscordHandler) SendReactions(guildID, channelID, messageID string) err
 
 	var blocks = slack_emoji_block_maker.Build(message.Reactions)
 
-	var textBlock = slack_webhook.BlockBase{
-		Type: "section",
-		Text: slack_webhook.BlockElement{
-			Type: "mrkdwn", Text: srcMessage.Text,
-		},
+	var element = slack_webhook.MrkdwnElement(srcMessage.Text)
+	var textBlock = slack_webhook.ContextBlock(element)
+
+	for _, block := range srcMessage.Blocks {
+		switch block.Type {
+		case "image":
+			blocks = append([]slack_webhook.BlockBase{block}, blocks...)
+		}
 	}
 
-	srcMessage.Blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
+	srcMessage.Blocks = append(srcMessage.Blocks, textBlock)
+	srcMessage.Blocks = append(srcMessage.Blocks, blocks...)
+
 	srcMessage.Channel = sdt.SlackChannel
 
 	_, err = d.slackWebhook.Update(srcMessage)

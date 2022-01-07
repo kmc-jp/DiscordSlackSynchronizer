@@ -18,7 +18,7 @@ func Build(reacts []*discordgo.MessageReactions) []slack_webhook.BlockBase {
 	for _, react := range reacts {
 		if react.Emoji.ID == "" {
 			var text = react.Emoji.Name
-			var stdEmojiElem = slack_webhook.BlockElement{Type: "mrkdwn", Text: text}
+			var stdEmojiElem = slack_webhook.MrkdwnElement(text)
 
 			elements = append(elements, stdEmojiElem)
 		} else {
@@ -32,31 +32,24 @@ func Build(reacts []*discordgo.MessageReactions) []slack_webhook.BlockBase {
 				imageURI = fmt.Sprintf("%s/%s.png", DiscordEmojiEndpoint, react.Emoji.ID)
 			}
 
-			var ctmEmojiElem = slack_webhook.BlockElement{Type: "image", ImageURL: imageURI, AltText: react.Emoji.Name}
+			var ctmEmojiElem = slack_webhook.ImageElement(imageURI, react.Emoji.Name)
 			elements = append(elements, ctmEmojiElem)
 		}
 
-		var countElem = slack_webhook.BlockElement{Type: "mrkdwn", Text: strconv.Itoa(react.Count)}
+		var countElem = slack_webhook.MrkdwnElement(strconv.Itoa(react.Count))
 		elements = append(elements, countElem)
 
 		emojiCount++
 		if emojiCount%4 == 0 {
-			var block = slack_webhook.BlockBase{
-				Type:     "context",
-				Elements: elements,
-			}
-
+			var block = slack_webhook.ContextBlock(elements...)
 			blocks = append(blocks, block)
+
 			elements = []slack_webhook.BlockElement{}
 		}
 	}
 
 	if emojiCount%4 > 0 {
-		var block = slack_webhook.BlockBase{
-			Type:     "context",
-			Elements: elements,
-		}
-
+		var block = slack_webhook.ContextBlock(elements...)
 		blocks = append(blocks, block)
 	}
 

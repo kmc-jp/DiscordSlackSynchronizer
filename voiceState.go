@@ -120,13 +120,11 @@ func (v VoiceChannels) SlackBlocksMultiChannel() ([]slack_webhook.BlockBase, err
 			continue
 		}
 		var channelBlocks = channel.SlackBlocksSingleChannel()
-
 		blocks = append(blocks, channelBlocks...)
 	}
 	if len(blocks) <= 1 {
-		element := slack_webhook.BlockElement{Type: "mrkdwn", Text: "誰もいない"}
-
-		var block = slack_webhook.BlockBase{Type: "context", Elements: []slack_webhook.BlockElement{element}}
+		element := slack_webhook.MrkdwnElement("誰もいない")
+		var block = slack_webhook.ContextBlock(element)
 		blocks = append(blocks, block)
 	}
 	return blocks, nil
@@ -137,14 +135,11 @@ func (c VoiceChannel) SlackBlocksSingleChannel() []slack_webhook.BlockBase {
 
 	channelText := fmt.Sprintf("<https://discord.com/channels/%s|%s: >", c.Channel.GuildID, c.Channel.Name)
 
-	var channelNameElement = slack_webhook.BlockElement{Type: "mrkdwn", Text: channelText}
+	var channelNameElement = slack_webhook.MrkdwnElement(channelText)
 
 	blocks = append(
 		blocks,
-		slack_webhook.BlockBase{
-			Type:     "context",
-			Elements: []slack_webhook.BlockElement{channelNameElement},
-		},
+		slack_webhook.ContextBlock(channelNameElement),
 	)
 
 	// Sort By User State
@@ -175,11 +170,7 @@ func (c VoiceChannel) SlackBlocksSingleChannel() []slack_webhook.BlockBase {
 			username = user.Member.User.Username
 		}
 
-		var imageElm = slack_webhook.BlockElement{
-			Type:     "image",
-			ImageURL: userImage,
-			AltText:  username,
-		}
+		var imageElm = slack_webhook.ImageElement(userImage, username)
 
 		emoji := ""
 		if user.Muted {
@@ -190,17 +181,13 @@ func (c VoiceChannel) SlackBlocksSingleChannel() []slack_webhook.BlockBase {
 		}
 
 		text := fmt.Sprintf("%s%s ", emoji, username)
-		var userElm = slack_webhook.BlockElement{Type: "mrkdwn", Text: text}
+		var userElm = slack_webhook.MrkdwnElement(text)
 
 		elements = append(elements, imageElm, userElm)
 
 		userCount++
 		if userCount%4 == 0 {
-			var block = slack_webhook.BlockBase{
-				Type:     "context",
-				Elements: elements,
-			}
-
+			var block = slack_webhook.ContextBlock(elements...)
 			blocks = append(blocks, block)
 
 			elements = []slack_webhook.BlockElement{}
@@ -208,16 +195,11 @@ func (c VoiceChannel) SlackBlocksSingleChannel() []slack_webhook.BlockBase {
 	}
 
 	if userCount%4 > 0 {
-		var block = slack_webhook.BlockBase{
-			Type:     "context",
-			Elements: elements,
-		}
-
+		var block = slack_webhook.ContextBlock(elements...)
 		blocks = append(blocks, block)
 	}
 
-	var div = slack_webhook.BlockBase{Type: "divider"}
-	blocks = append(blocks, div)
+	blocks = append(blocks, slack_webhook.DividerBlock())
 
 	return blocks
 }
