@@ -531,8 +531,7 @@ func (d *DiscordHandler) SendReactions(guildID, channelID, messageID string) err
 		}
 	}
 
-	srcMessage.Blocks = append(srcMessage.Blocks, textBlock)
-	srcMessage.Blocks = append(srcMessage.Blocks, blocks...)
+	srcMessage.Blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
 
 	srcMessage.Channel = sdt.SlackChannel
 
