@@ -89,8 +89,6 @@ SLACK_API_TOKEN=xoxb-SlackToken
 SLACK_EVENT_TOKEN=*****
 
 DISCORD_BOT_TOKEN=Discord Bot Token
-
-GYAZO_API_TOKEN=Gyazo API Token
 ```
 
 ## Discordの全チャンネルをSlackのそれぞれの同名のチャンネルに共有する
