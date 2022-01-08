@@ -74,6 +74,10 @@ remote_files:write
 
 users.profile:read
 users:read
+
+file:write:user
+chat:write:user
+emoji:read:user
 ```
 
 ### チャンネルの追加
