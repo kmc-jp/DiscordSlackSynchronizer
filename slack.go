@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -28,8 +29,6 @@ type SlackHandler struct {
 		Channel *regexp.Regexp
 		URI     *regexp.Regexp
 	}
-
-	gyazo *GyazoHandler
 
 	messageUnescaper *strings.Replacer
 
@@ -117,10 +116,6 @@ func (s *SlackHandler) Do() {
 	}
 }
 
-func (s *SlackHandler) SetGyazoHandler(g *GyazoHandler) {
-	s.gyazo = g
-}
-
 func (s *SlackHandler) SetReactionHandler(handler ReactionHandler) {
 	s.reactionHandler = handler
 }
@@ -172,35 +167,42 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		return
 	}
 
-	var fileURL []string
+	type imageFileType struct {
+		info   slackevents.File
+		reader io.Reader
+	}
 
-	if s.gyazo != nil {
-		for _, f := range ev.Files {
-			if f.Filetype == "png" || f.Filetype == "jpg" || f.Filetype == "gif" {
-				req, err := http.NewRequest("GET", f.URLPrivate, nil)
+	var ImageFiles []imageFileType
+	var files = []*slack.File{}
 
-				req.Header.Set("Authorization", "Bearer "+s.apiToken)
-				if err != nil {
-					continue
-				}
+	for _, f := range ev.Files {
 
-				client := new(http.Client)
-				resp, err := client.Do(req)
-				if err != nil {
-					continue
-				}
-				defer resp.Body.Close()
+		if f.Filetype == "png" || f.Filetype == "jpg" || f.Filetype == "gif" {
+			req, err := http.NewRequest("GET", f.URLPrivate, nil)
 
-				image, err := s.gyazo.Upload(resp.Body)
-				if err != nil {
-					fileURL = append(fileURL, f.URLPrivate)
-					continue
-				}
-				fileURL = append(fileURL, image.PermalinkURL+"."+f.Filetype)
-			} else {
-				fileURL = append(fileURL, f.URLPrivate)
+			req.Header.Set("Authorization", "Bearer "+s.apiToken)
+			if err != nil {
+				continue
 			}
 
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				continue
+			}
+			defer resp.Body.Close()
+			var image = imageFileType{
+				info:   f,
+				reader: resp.Body,
+			}
+
+			ImageFiles = append(ImageFiles, image)
+		} else {
+			sFile, _, _, err := s.userAPI.ShareFilePublicURL(f.ID)
+			if err != nil {
+				log.Printf("ErrorAtShareFilePublicURL: %s\n", err.Error())
+				continue
+			}
+			files = append(files, sFile)
 		}
 	}
 
@@ -230,20 +232,95 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// Send by webhook
-	newMessage, err := s.discordHook.Send(message.ChannelID, message.ID, message, true, nil)
+	newMessage, err := s.discordHook.Send(message.ChannelID, message, true, nil)
 	if err != nil {
 		log.Println(errors.Wrap(err, "ResendingMessage: "))
 		return
 	}
 
+	// send file links by webhook
+	for _, f := range files {
+		message = discord_webhook.Message{
+			AvaterURL: user.Profile.ImageOriginal,
+			UserName:  name,
+			Message: &discordgo.Message{
+				Content: f.PermalinkPublic,
+			},
+		}
+
+		newMessage, err = s.discordHook.Send(cs.DiscordChannel, message, true, nil)
+		if err != nil {
+			log.Println(errors.Wrap(err, "ResendingFileMessage: "))
+			return
+		}
+	}
+
+	var dFiles = []discord_webhook.File{}
+	// upload images to discord
+	if len(ImageFiles) > 0 {
+		for _, f := range ImageFiles {
+			dFiles = append(dFiles, discord_webhook.File{
+				FileName:    f.info.Name,
+				Reader:      f.reader,
+				ContentType: "image/" + f.info.Filetype,
+			})
+		}
+		message = discord_webhook.Message{
+			AvaterURL: user.Profile.ImageOriginal,
+			UserName:  name,
+		}
+
+		newMessage, err = s.discordHook.Send(cs.DiscordChannel, message, true, dFiles)
+		if err != nil {
+			log.Println(errors.Wrap(err, "ResendingFileMessage: "))
+			return
+		}
+	}
+
+	// if user api token is provided, delete message and repost it.
 	if s.userAPI != nil {
-		_, _, err = s.userAPI.DeleteMessage(ev.Channel, ev.TimeStamp)
+		_, _, err := s.userAPI.DeleteMessage(ev.Channel, ev.TimeStamp)
 		if err == nil {
+			var content = fmt.Sprintf("%s <%s%s|%s>", ev.Text, SlackMessageDummyURI, newMessage.Timestamp, "ㅤ")
+			var blocks = []slack_webhook.BlockBase{}
+
+			for i, image := range ImageFiles {
+				if len(newMessage.Attachments) > i {
+					var block = slack_webhook.ImageBlock(newMessage.Attachments[i].URL, image.info.Name)
+					block.Title = slack_webhook.ImageTitle(image.info.Name, false)
+					blocks = append(blocks, block)
+				}
+			}
+
+			for _, file := range files {
+				var externalID = fmt.Sprintf("DiscordSlackSync:%s", file.ID)
+				_, err := s.hook.FilesRemoteAdd(
+					slack_webhook.FilesRemoteAddParameters{
+						Title:       file.Name,
+						ExternalURL: file.PermalinkPublic,
+						ExternalID:  externalID,
+						FileType:    file.Filetype,
+					},
+				)
+				if err != nil {
+					log.Printf("FilesRemoteAddError: %s\n", err.Error())
+					continue
+				}
+				blocks = append(blocks, slack_webhook.FileBlock(externalID))
+			}
+
+			if len(ImageFiles) > 0 {
+				var section = slack_webhook.SectionBlock()
+				section.Text = slack_webhook.MrkdwnElement(content)
+				blocks = append([]slack_webhook.BlockBase{section}, blocks...)
+			}
+
 			var message = slack_webhook.Message{
 				IconURL:     user.Profile.ImageOriginal,
 				Username:    name,
 				Channel:     ev.Channel,
-				Text:        fmt.Sprintf("%s <%s%s|%s>", ev.Text, SlackMessageDummyURI, newMessage.Timestamp, "ㅤ"),
+				Text:        content,
+				Blocks:      blocks,
 				UnfurlLinks: true,
 				UnfurlMedia: true,
 				LinkNames:   true,
@@ -254,19 +331,6 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		}
 	}
 
-	for _, f := range fileURL {
-		message = discord_webhook.Message{
-			AvaterURL: user.Profile.ImageOriginal,
-			UserName:  name,
-			Message: &discordgo.Message{
-				GuildID:   discordID,
-				ChannelID: cs.DiscordChannel,
-				Content:   f,
-			},
-		}
-
-		s.discordHook.Send(message.ChannelID, message.ID, message, false, nil)
-	}
 }
 
 func (s *SlackHandler) EscapeMessage(content string) (output string, err error) {

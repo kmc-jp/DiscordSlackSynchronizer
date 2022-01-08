@@ -299,8 +299,8 @@ func (h *Handler) Edit(channelID, messageID string, message Message, files []Fil
 	return h.send("EDIT", channelID, messageID, message, false, files)
 }
 
-func (h *Handler) Send(channelID, messageID string, message Message, wait bool, files []File) (*Message, error) {
-	return h.send("SEND", channelID, messageID, message, wait, files)
+func (h *Handler) Send(channelID string, message Message, wait bool, files []File) (*Message, error) {
+	return h.send("SEND", channelID, "", message, wait, files)
 }
 
 func (h *Handler) GetMessage(channelID, messageID string) (message discordgo.Message, err error) {

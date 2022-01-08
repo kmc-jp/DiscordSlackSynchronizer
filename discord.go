@@ -291,7 +291,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		log.Println(err)
 	} else {
 		// if it was successed, send message by webhook
-		message, err := d.hook.Send(m.ChannelID, m.ID, dMessage, false, dFiles)
+		message, err := d.hook.Send(m.ChannelID, dMessage, false, dFiles)
 		if err != nil {
 			log.Printf("MessageSendError: %s", err)
 		}

@@ -48,11 +48,6 @@ func init() {
 }
 
 func main() {
-	Gyazo, err := NewGyazoHandler(Tokens.Gyazo.API)
-	if err != nil {
-		fmt.Println("Gyazo initialize error:", err)
-	}
-
 	imager, err := slack_emoji_imager.New(Tokens.Slack.User, Tokens.Slack.API)
 	if err != nil {
 		fmt.Println("Imager initialize error:", err)
@@ -88,7 +83,6 @@ func main() {
 
 	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)
 
-	Slack.SetGyazoHandler(Gyazo)
 	Slack.SetReactionHandler(discordReactionHandler)
 	Slack.SetDiscordWebhook(DiscordWebhook)
 	Slack.SetSlackWebhook(slackWebhookHandler)
