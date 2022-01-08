@@ -39,7 +39,6 @@ func init() {
 	Tokens.Slack.API = os.Getenv("SLACK_API_TOKEN")
 	Tokens.Slack.Event = os.Getenv("SLACK_EVENT_TOKEN")
 	Tokens.Discord.API = os.Getenv("DISCORD_BOT_TOKEN")
-	Tokens.Gyazo.API = os.Getenv("GYAZO_API_TOKEN")
 	Tokens.Slack.User = os.Getenv("SLACK_API_USER_TOKEN")
 	SettingsFile = filepath.Join(os.Getenv("STATE_DIRECTORY"), "settings.json")
 	if SettingsFile == "" {
@@ -72,12 +71,12 @@ func main() {
 	Discord.SetDiscordWebhook(DiscordWebhook)
 
 	go func() {
+		// start Discord session
 		err := Discord.Do()
 		if err != nil {
 			fmt.Println("Error opening Discord session: ", err)
 		}
 
-		// Wait here until CTRL-C or other term signal is received.
 		fmt.Println("Discord session is now running.  Press CTRL-C to exit.")
 	}()
 
@@ -88,6 +87,7 @@ func main() {
 	Slack.SetSlackWebhook(slackWebhookHandler)
 	Slack.SetUserToken(Tokens.Slack.User)
 
+	// start Slack session
 	go Slack.Do()
 
 	discordReactionHandler.SetMessageEscaper(Slack)
@@ -95,6 +95,7 @@ func main() {
 	var sockType = os.Getenv("SOCK_TYPE")
 	var listenAddr = os.Getenv("LISTEN_ADDRESS")
 
+	// start web configurator
 	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API, SettingsFile)
 	switch sockType {
 	case "tcp", "unix":
@@ -117,6 +118,7 @@ func main() {
 		fmt.Printf("Start Configuration Server on: %s:%s\n", sockType, listenAddr)
 	}
 
+	// wait syscall
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
