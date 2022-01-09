@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
@@ -67,6 +68,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 		return err
 	}
 
+	var oldAttachments []*discordgo.MessageAttachment
 	var message discord_webhook.Message
 	if strings.Contains(srcContent.Text, "<"+SlackMessageDummyURI) {
 		var sepMessage = strings.Split(srcContent.Text, "<"+SlackMessageDummyURI)
@@ -93,6 +95,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 
 			if t.UnixMilli() < srcT.UnixMilli() {
 				message.Message = &messages[i-1]
+				oldAttachments = messages[i-1].Attachments
 				break
 			}
 		}
@@ -172,9 +175,47 @@ next:
 		ContentType: "image/gif",
 	}
 
-	_, err = d.hook.Edit(message.ChannelID, message.ID, message, append(dFiles, file))
+	newMessage, err := d.hook.Edit(message.ChannelID, message.ID, message, append(dFiles, file))
+	if err != nil {
+		return errors.Wrap(err, "DiscordMessageEdit")
+	}
 
-	return errors.Wrap(err, "DiscordMessageEdit")
+	for i, block := range srcContent.Blocks {
+		if block.Type != "file" {
+			continue
+		}
+
+		for j, oldAttachment := range oldAttachments {
+			if block.ExternalID != fmt.Sprintf("%s:%s/%s", ProgramName, message.GuildID, oldAttachment.ID) {
+				continue
+			}
+
+			if len(newMessage.Attachments) <= j {
+				continue
+			}
+
+			var externalID = fmt.Sprintf("%s:%s/%s", ProgramName, message.GuildID, newMessage.Attachments[j].ID)
+
+			_, err = d.slackHook.FilesRemoteAdd(
+				slack_webhook.FilesRemoteAddParameters{
+					Title:      block.Title.Text,
+					FileType:   slack_webhook.FindFileType(block.Title.Text),
+					ExternalID: externalID,
+				},
+			)
+
+			if err != nil {
+				log.Printf("%s\n", err.Error())
+				continue
+			}
+
+			srcContent.Blocks[i].ExternalID = externalID
+		}
+	}
+
+	_, err = d.slackHook.Update(*srcContent)
+
+	return err
 }
 
 func (d *DiscordReactionHandler) AddEmoji(name, value string) {

@@ -35,6 +35,8 @@ var Slack *SlackHandler
 var Discord *DiscordHandler
 var Gyazo *GyazoHandler
 
+const ProgramName = "DiscordSlackSync"
+
 func init() {
 	Tokens.Slack.API = os.Getenv("SLACK_API_TOKEN")
 	Tokens.Slack.Event = os.Getenv("SLACK_EVENT_TOKEN")

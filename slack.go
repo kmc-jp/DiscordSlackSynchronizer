@@ -176,7 +176,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	var files = []slackevents.File{}
 
 	for _, f := range ev.Files {
-
+		// if the file is image, upload it for discord
 		if f.Filetype == "png" || f.Filetype == "jpg" || f.Filetype == "gif" {
 			req, err := http.NewRequest("GET", f.URLPrivate, nil)
 
@@ -288,7 +288,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 			}
 
 			for _, file := range files {
-				var externalID = fmt.Sprintf("DiscordSlackSync:%s", file.ID)
+				var externalID = fmt.Sprintf("%s:%s", ProgramName, file.ID)
 				_, err := s.hook.FilesRemoteAdd(
 					slack_webhook.FilesRemoteAddParameters{
 						Title:       file.Name,
