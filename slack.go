@@ -173,7 +173,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	var ImageFiles []imageFileType
-	var files = []*slack.File{}
+	var files = []slackevents.File{}
 
 	for _, f := range ev.Files {
 
@@ -197,12 +197,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 
 			ImageFiles = append(ImageFiles, image)
 		} else {
-			sFile, _, _, err := s.userAPI.ShareFilePublicURL(f.ID)
-			if err != nil {
-				log.Printf("ErrorAtShareFilePublicURL: %s\n", err.Error())
-				continue
-			}
-			files = append(files, sFile)
+			files = append(files, f)
 		}
 	}
 
