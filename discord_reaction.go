@@ -55,7 +55,6 @@ func (d *DiscordReactionHandler) SetSlackWebhook(hook *slack_webhook.Handler) {
 }
 
 func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) error {
-	const DiscordCdnURI = "https://cdn.discordapp.com/"
 	const ReactionGifName = "reactions.gif"
 
 	var cs, _ = findDiscordChannel(channel)
