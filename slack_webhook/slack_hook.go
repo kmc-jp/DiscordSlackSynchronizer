@@ -145,8 +145,7 @@ func (s *Handler) send(jsondataBytes []byte, method string) (string, error) {
 	req.Header.Set("Authorization", "Bearer "+s.token)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("MessageSendError(Slack): %w", err)
 	}
@@ -213,12 +212,12 @@ func (s *Handler) GetMessages(channelID, timestamp string, limit int) ([]Message
 	return msgs, nil
 }
 
-func (s *Handler) GetMessage(channelID, timestamp string) (string, error) {
+func (s *Handler) GetMessage(channelID, timestamp string) (*Message, error) {
 	msgs, err := s.GetMessages(channelID, timestamp, 1)
 	if len(msgs) < 1 {
-		return "", errors.Wrap(err, "NotFound")
+		return nil, errors.Wrap(err, "NotFound")
 	}
-	return msgs[0].Text, err
+	return &msgs[0], err
 }
 
 func (s *Handler) getMessages(query string) ([]Message, error) {

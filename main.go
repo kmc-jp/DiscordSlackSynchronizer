@@ -64,7 +64,7 @@ func main() {
 	discordReactionHandler.SetDiscordWebhook(DiscordWebhook)
 
 	var slackWebhookHandler = slack_webhook.New(Tokens.Slack.API)
-	discordReactionHandler.SetMessageGetter(slackWebhookHandler)
+	discordReactionHandler.SetSlackWebhook(slackWebhookHandler)
 
 	Discord = NewDiscordBot(Tokens.Discord.API)
 	Discord.SetSlackWebhook(slackWebhookHandler)

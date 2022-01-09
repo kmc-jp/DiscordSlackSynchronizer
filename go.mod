@@ -1,6 +1,6 @@
 module github.com/kmc-jp/DiscordSlackSynchronizer
 
-go 1.12
+go 1.15
 
 require (
 	github.com/bwmarrin/discordgo v0.23.2
