@@ -188,9 +188,13 @@ next:
 		case "image":
 			for j, oldAttachment := range oldAttachments {
 				if len(newMessage.Attachments) <= j || newMessage.Attachments[j].Filename != oldAttachment.Filename {
-					fmt.Println(newMessage.Attachments[j].Filename, oldAttachment.Filename)
 					continue
 				}
+
+				if oldAttachment.URL != block.ImageURL {
+					continue
+				}
+
 				srcContent.Blocks[i] = slack_webhook.ImageBlock(newMessage.Attachments[j].URL, block.AltText)
 			}
 		case "file":
