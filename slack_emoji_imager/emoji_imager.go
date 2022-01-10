@@ -114,77 +114,77 @@ func (s *Imager) MakeReactionsImage(channel string, timestamp string) (r io.Read
 		Image: frames,
 	}
 
-	{
-		ft, err := truetype.Parse(gobold.TTF)
-		if err != nil {
-			return nil, errors.Wrap(err, "FontParseError")
-		}
+	ft, err := truetype.Parse(gobold.TTF)
+	if err != nil {
+		return nil, errors.Wrap(err, "FontParseError")
+	}
 
-		var setEmojiToImage = func(fromFrame, toFrame int) {
-			for frameNum := fromFrame; frameNum < toFrame; frameNum++ {
-				var frame = image.NewPaletted(image.Rect(0, 0, imageWidth, imageLaneHeight*((len(reactions)-1)/laneReactionNum+1)), colorPalette)
-				frame = s.fillFrame(frame, color.White)
+	var setEmojiToImage = func(fromFrame, toFrame int) {
+		for frameNum := fromFrame; frameNum < toFrame; frameNum++ {
+			var frame = image.NewPaletted(image.Rect(0, 0, imageWidth, imageLaneHeight*((len(reactions)-1)/laneReactionNum+1)), colorPalette)
+			frame = s.fillFrame(frame, color.White)
 
-				for j, reaction := range reactions {
-					// draw reaction image
-					var img *image.Paletted
-					var bound image.Rectangle
-					if reaction.image.isGif {
-						// if image is gif, select a draw frame
-						if frameNum >= len(reaction.image.converted) {
-							// frameNum%len(reaction.image.converted) make GIF loop
-							img = reaction.image.converted[frameNum%len(reaction.image.converted)]
-							bound = reaction.image.bounds[frameNum%len(reaction.image.converted)]
-						} else {
-							img = reaction.image.converted[frameNum]
-							bound = reaction.image.bounds[frameNum]
-						}
+			for j, reaction := range reactions {
+				// draw reaction image
+				var img *image.Paletted
+				var bound image.Rectangle
+				if reaction.image.isGif {
+					// if image is gif, select a draw frame
+					if frameNum >= len(reaction.image.converted) {
+						// frameNum%len(reaction.image.converted) make GIF loop
+						img = reaction.image.converted[frameNum%len(reaction.image.converted)]
+						bound = reaction.image.bounds[frameNum%len(reaction.image.converted)]
 					} else {
-						img = reaction.image.other
-						if img == nil {
-							continue
-						}
-						bound = img.Bounds()
+						img = reaction.image.converted[frameNum]
+						bound = reaction.image.bounds[frameNum]
 					}
-
-					var imgPoint = image.Point{
-						img.Bounds().Min.X + reactionWidth*(j%laneReactionNum) + reactionMerginSize + reactionEmojiSize/2 - img.Bounds().Dx()/2,
-						img.Bounds().Min.Y + imageLaneHeight*(j/laneReactionNum) + reactionMerginSize + reactionEmojiSize/2 - img.Bounds().Dy()/2,
+				} else {
+					img = reaction.image.other
+					if img == nil {
+						continue
 					}
-
-					draw.Copy(frame, imgPoint, img, bound, draw.Over, nil)
-
-					// draw reaction number
-					var number = strconv.Itoa(reaction.Count)
-
-					var dr = &font.Drawer{
-						Dst: frame,
-						Src: image.Black,
-						Face: truetype.NewFace(
-							ft,
-							&truetype.Options{
-								Size: reactionNumSize,
-							},
-						),
-						Dot: fixed.Point26_6{},
-					}
-
-					dr.Dot.X = fixed.I(reactionWidth*(j%laneReactionNum)+reactionMerginSize+reactionEmojiSize) +
-						(fixed.I(reactionNumSize)-dr.MeasureString(number))/2
-					dr.Dot.Y = fixed.I(reactionEmojiSize) + fixed.I(imageLaneHeight*(j/laneReactionNum))
-
-					dr.DrawString(number)
+					bound = img.Bounds()
 				}
 
-				gifImage.Image[frameNum] = frame
-			}
-		}
+				var imgPoint = image.Point{
+					img.Bounds().Min.X + reactionWidth*(j%laneReactionNum) + reactionMerginSize + reactionEmojiSize/2 - img.Bounds().Dx()/2,
+					img.Bounds().Min.Y + imageLaneHeight*(j/laneReactionNum) + reactionMerginSize + reactionEmojiSize/2 - img.Bounds().Dy()/2,
+				}
 
-		s.paralleExec(maxFrame, setEmojiToImage)
+				draw.Copy(frame, imgPoint, img, bound, draw.Over, nil)
+
+				// draw reaction number
+				var number = strconv.Itoa(reaction.Count)
+
+				var dr = &font.Drawer{
+					Dst: frame,
+					Src: image.Black,
+					Face: truetype.NewFace(
+						ft,
+						&truetype.Options{
+							Size: reactionNumSize,
+						},
+					),
+					Dot: fixed.Point26_6{},
+				}
+
+				dr.Dot.X = fixed.I(reactionWidth*(j%laneReactionNum)+reactionMerginSize+reactionEmojiSize) +
+					(fixed.I(reactionNumSize)-dr.MeasureString(number))/2
+				dr.Dot.Y = fixed.I(reactionEmojiSize) + fixed.I(imageLaneHeight*(j/laneReactionNum))
+
+				dr.DrawString(number)
+			}
+
+			gifImage.Image[frameNum] = frame
+		}
 	}
+
+	s.paralleExec(maxFrame, setEmojiToImage)
 
 	gifImage.Delay = make([]int, maxFrame)
 	gifImage.Disposal = make([]byte, maxFrame)
+
+	// TODO: Dynamically adjust the delay time value
 
 	for i := range gifImage.Delay {
 		gifImage.Delay[i] = 4
@@ -211,6 +211,7 @@ func (s *Imager) fillFrame(frame *image.Paletted, c color.Color) *image.Paletted
 
 	return newFrame
 }
+
 func (s *Imager) paralleExec(max int, execFunc func(from, to int)) {
 	var cpus = runtime.NumCPU()
 	var wg sync.WaitGroup
