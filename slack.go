@@ -304,7 +304,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 				blocks = append(blocks, slack_webhook.FileBlock(externalID))
 			}
 
-			if len(ImageFiles) > 0 {
+			if len(ImageFiles) > 0 && ev.Text != "" {
 				var section = slack_webhook.SectionBlock()
 				section.Text = slack_webhook.MrkdwnElement(content)
 				blocks = append([]slack_webhook.BlockBase{section}, blocks...)

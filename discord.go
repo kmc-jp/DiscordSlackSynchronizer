@@ -312,7 +312,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		} else {
 			if attach.URL != "" {
 				// add rich file link to the slack message
-				var externalID = fmt.Sprintf("DiscordSlackSync:%s/%s", m.GuildID, attach.ID)
+				var externalID = fmt.Sprintf("%s:%s/%s", ProgramName, m.ChannelID, attach.ID)
 
 				_, err := d.slackWebhook.FilesRemoteAdd(
 					slack_webhook.FilesRemoteAddParameters{
@@ -396,7 +396,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		content += fmt.Sprintf(" <%s%s|%s>", SlackMessageDummyURI, m.Message.Timestamp, "ㅤ")
 	}
 
-	if len(blocks) > 0 {
+	if len(blocks) > 0 && m.Content != "" {
 		var textBlock = slack_webhook.ContextBlock(slack_webhook.MrkdwnElement(content))
 		blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
 	}

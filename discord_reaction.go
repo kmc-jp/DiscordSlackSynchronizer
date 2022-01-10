@@ -65,8 +65,9 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 
 	srcContent, err := d.slackHook.GetMessage(channel, timestamp)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "SlackGetMessage")
 	}
+	srcContent.Channel = channel
 
 	var oldAttachments []*discordgo.MessageAttachment
 	var message discord_webhook.Message
@@ -116,6 +117,7 @@ next:
 
 		for i, msg := range messages {
 			if content == msg.Content {
+
 				message.Message = &messages[i]
 				break
 			}
@@ -164,9 +166,9 @@ next:
 		break
 	case slack_emoji_imager.ErrorNoReactions:
 		_, err = d.hook.Edit(message.ChannelID, message.ID, message, dFiles)
-		return err
+		return errors.Wrap(err, "EditSlackMessage")
 	default:
-		return err
+		return errors.Wrap(err, "MakeReactionImage")
 	}
 
 	var file = discord_webhook.File{
@@ -181,41 +183,53 @@ next:
 	}
 
 	for i, block := range srcContent.Blocks {
-		if block.Type != "file" {
-			continue
-		}
-
-		for j, oldAttachment := range oldAttachments {
-			if block.ExternalID != fmt.Sprintf("%s:%s/%s", ProgramName, message.GuildID, oldAttachment.ID) {
-				continue
+		switch block.Type {
+		case "image":
+			for j, oldAttachment := range oldAttachments {
+				if len(newMessage.Attachments) <= j || newMessage.Attachments[j].Filename != oldAttachment.Filename {
+					fmt.Println(newMessage.Attachments[j].Filename, oldAttachment.Filename)
+					continue
+				}
+				srcContent.Blocks[i] = slack_webhook.ImageBlock(newMessage.Attachments[j].URL, block.AltText)
 			}
+		case "file":
+			for j, oldAttachment := range oldAttachments {
+				var externalID = fmt.Sprintf("%s:%s/%s", ProgramName, newMessage.ChannelID, oldAttachment.ID)
 
-			if len(newMessage.Attachments) <= j {
-				continue
+				if block.ExternalID != externalID && len(newMessage.Attachments) <= j {
+					continue
+				}
+
+				sFile, err := d.slackHook.FilesRemoteInfo(externalID, "")
+				if err != nil {
+					log.Printf("FilesRemoteInfo: %s\n", err.Error())
+					continue
+				}
+
+				externalID = fmt.Sprintf("%s:%s/%s", ProgramName, newMessage.ChannelID, newMessage.Attachments[j].ID)
+
+				_, err = d.slackHook.FilesRemoteAdd(
+					slack_webhook.FilesRemoteAddParameters{
+						ExternalURL: newMessage.Attachments[j].URL,
+						Title:       sFile.Title,
+						FileType:    sFile.Filetype,
+						ExternalID:  externalID,
+					},
+				)
+
+				if err != nil {
+					log.Printf("FilesRemoteAdd: %s\n", err.Error())
+					continue
+				}
+
+				srcContent.Blocks[i].ExternalID = externalID
 			}
-
-			var externalID = fmt.Sprintf("%s:%s/%s", ProgramName, message.GuildID, newMessage.Attachments[j].ID)
-
-			_, err = d.slackHook.FilesRemoteAdd(
-				slack_webhook.FilesRemoteAddParameters{
-					Title:      block.Title.Text,
-					FileType:   slack_webhook.FindFileType(block.Title.Text),
-					ExternalID: externalID,
-				},
-			)
-
-			if err != nil {
-				log.Printf("%s\n", err.Error())
-				continue
-			}
-
-			srcContent.Blocks[i].ExternalID = externalID
 		}
 	}
 
 	_, err = d.slackHook.Update(*srcContent)
 
-	return err
+	return errors.Wrap(err, "UpdateSlackMessage")
 }
 
 func (d *DiscordReactionHandler) AddEmoji(name, value string) {
