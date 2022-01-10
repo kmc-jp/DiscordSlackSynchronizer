@@ -552,9 +552,6 @@ func (d *DiscordHandler) SendReactions(guildID, channelID, messageID string) err
 
 	var blocks = slack_emoji_block_maker.Build(message.Reactions)
 
-	var element = slack_webhook.MrkdwnElement(srcMessage.Text)
-	var textBlock = slack_webhook.ContextBlock(element)
-
 	for _, block := range srcMessage.Blocks {
 		switch block.Type {
 		case "image", "file":
@@ -562,7 +559,15 @@ func (d *DiscordHandler) SendReactions(guildID, channelID, messageID string) err
 		}
 	}
 
-	srcMessage.Blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
+	// add Slack text block if the message has text
+	if strings.TrimSpace(strings.Split(srcMessage.Text, "<"+SlackMessageDummyURI)[0]) != "" {
+		var element = slack_webhook.MrkdwnElement(srcMessage.Text)
+		var textBlock = slack_webhook.ContextBlock(element)
+
+		blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
+	}
+
+	srcMessage.Blocks = blocks
 	srcMessage.Channel = sdt.SlackChannel
 
 	_, err = d.slackWebhook.Update(srcMessage)
