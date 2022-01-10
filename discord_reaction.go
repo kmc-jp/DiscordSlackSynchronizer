@@ -182,6 +182,7 @@ next:
 		return errors.Wrap(err, "DiscordMessageEdit")
 	}
 
+	// reset file and image urls of Slack blocks
 	for i, block := range srcContent.Blocks {
 		switch block.Type {
 		case "image":

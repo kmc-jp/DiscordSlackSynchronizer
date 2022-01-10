@@ -71,11 +71,11 @@ groups:read
 
 reactions:read
 remote_files:write
+remote_files:read
 
 users.profile:read
 users:read
 
-file:write:user
 chat:write:user
 emoji:read:user
 ```
