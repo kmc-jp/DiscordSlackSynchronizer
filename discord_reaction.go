@@ -196,6 +196,7 @@ next:
 				}
 
 				srcContent.Blocks[i] = slack_webhook.ImageBlock(newMessage.Attachments[j].URL, block.AltText)
+				srcContent.Blocks[i].Title = slack_webhook.ImageTitle(block.Title.Text, false)
 			}
 		case "file":
 			for j, oldAttachment := range oldAttachments {
