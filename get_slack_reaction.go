@@ -184,7 +184,7 @@ next:
 			var found bool
 			for j, oldAttachment := range oldAttachments {
 				// find attachment of the image
-				if len(newMessage.Attachments) <= attachmentIndex || newMessage.Attachments[attachmentIndex].Filename != oldAttachment.Filename {
+				if len(newMessage.Attachments) <= j || newMessage.Attachments[j].Filename != oldAttachment.Filename {
 					continue
 				}
 				if oldAttachment.URL != block.ImageURL {
@@ -208,7 +208,7 @@ next:
 			// find attachment of the file
 			for j, oldAttachment := range oldAttachments {
 				externalID = fmt.Sprintf("%s:%s/%s", ProgramName, newMessage.ChannelID, oldAttachment.ID)
-				if block.ExternalID != externalID || len(newMessage.Attachments) <= attachmentIndex {
+				if block.ExternalID != externalID || len(newMessage.Attachments) <= j {
 					continue
 				}
 
