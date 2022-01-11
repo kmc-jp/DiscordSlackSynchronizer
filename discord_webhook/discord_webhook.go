@@ -303,6 +303,38 @@ func (h *Handler) Send(channelID string, message Message, wait bool, files []Fil
 	return h.send("SEND", channelID, "", message, wait, files)
 }
 
+func (h *Handler) GetGuildChannels(guildID string) (channels []discordgo.Channel, err error) {
+	var client = http.DefaultClient
+	req, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("%s/guilds/%s/channels", DiscordAPIEndpoint, guildID),
+		nil,
+	)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Authorization", "Bot "+h.token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "ReadAll")
+	}
+
+	err = json.Unmarshal(body, &channels)
+	if err != nil {
+		return nil, fmt.Errorf("UnmarshalJSON: %s body: %s", err.Error(), body)
+	}
+
+	return
+}
+
 func (h *Handler) GetMessage(channelID, messageID string) (message discordgo.Message, err error) {
 	var requestAttr = make(url.Values)
 

@@ -6,6 +6,10 @@ import (
 	"io/ioutil"
 )
 
+type SettingsHandler struct {
+	channelMap *ChannelMap
+}
+
 //SlackDiscordTable dict of Channel
 type SlackDiscordTable struct {
 	Discord       string           `json:"discord_server"`
@@ -32,7 +36,13 @@ type SendSetting struct {
 	CreateSlackChannelOnSend bool `json:"CreateSlackChannelOnSend"`
 }
 
-func readChannelMap() []SlackDiscordTable {
+func NewSettingsHandler(slackToken, discordToken string) *SettingsHandler {
+	return &SettingsHandler{
+		channelMap: NewChannelMap(slackToken, discordToken),
+	}
+}
+
+func (s SettingsHandler) readChannelMap() []SlackDiscordTable {
 	var dict []SlackDiscordTable
 	dataBytes, err := ioutil.ReadFile(SettingsFile)
 	if err != nil {
@@ -51,15 +61,15 @@ func readChannelMap() []SlackDiscordTable {
 	return dict
 }
 
-func findSlackChannel(DiscordChannel string, guildID string) ChannelSetting {
-	var dict = readChannelMap()
+func (s SettingsHandler) FindSlackChannel(DiscordChannel string, guildID string) ChannelSetting {
+	var dict = s.readChannelMap()
 
 	var result ChannelSetting
 	if dict == nil {
 		return ChannelSetting{}
 	}
 	for _, c := range dict {
-		ChannelMap.UpdateChannels(c.Discord, c.SlackSuffix, c.DiscordSuffix)
+		s.channelMap.UpdateChannels(c.Discord, c.SlackSuffix, c.DiscordSuffix)
 
 		if c.Discord == guildID {
 			for _, channelSet := range c.Channel {
@@ -70,7 +80,7 @@ func findSlackChannel(DiscordChannel string, guildID string) ChannelSetting {
 				// Complete Transfer
 				if channelSet.SlackChannel == "all" && channelSet.DiscordChannel == "all" {
 					result = channelSet
-					result.SlackChannel = ChannelMap.DiscordToSlack(
+					result.SlackChannel = s.channelMap.DiscordToSlack(
 						DiscordChannel, result.Setting.CreateSlackChannelOnSend)
 					if result.SlackChannel == "" {
 						continue
@@ -89,14 +99,14 @@ func findSlackChannel(DiscordChannel string, guildID string) ChannelSetting {
 	return result
 }
 
-//findDiscordChannel find Discord channel from slack channel id
-func findDiscordChannel(SlackChannel string) (ChannelSetting, string) {
-	var dict = readChannelMap()
+// FindDiscordChannel find Discord channel from slack channel id
+func (s SettingsHandler) FindDiscordChannel(SlackChannel string) (ChannelSetting, string) {
+	var dict = s.readChannelMap()
 	if dict == nil {
 		return ChannelSetting{}, ""
 	}
 	for _, c := range dict {
-		ChannelMap.UpdateChannels(c.Discord, c.SlackSuffix, c.DiscordSuffix)
+		s.channelMap.UpdateChannels(c.Discord, c.SlackSuffix, c.DiscordSuffix)
 
 		for _, channelSet := range c.Channel {
 			if channelSet.SlackChannel == SlackChannel && channelSet.DiscordChannel != "all" {
@@ -105,7 +115,7 @@ func findDiscordChannel(SlackChannel string) (ChannelSetting, string) {
 			// Complete Transfer
 			if channelSet.SlackChannel == "all" && channelSet.DiscordChannel == "all" {
 				result := channelSet
-				result.DiscordChannel = ChannelMap.SlackToDiscord(SlackChannel)
+				result.DiscordChannel = s.channelMap.SlackToDiscord(SlackChannel)
 				if result.DiscordChannel == "" {
 					continue
 				}

@@ -10,40 +10,49 @@ import (
 	"github.com/slack-go/slack"
 )
 
-var ChannelMap ChannelMapType = ChannelMapType{
-	slackToDiscord:   map[string]string{},
-	discordToSlack:   map[string]string{},
-	slackIDByName:    map[string]string{},
-	slackNameByID:    map[string]string{},
-	discordIDBylName: map[string]string{},
-	discordNameByID: map[string]string{},
-}
+type ChannelMap struct {
+	slack   *slack.Client
+	discord *discordgo.Session
 
-type ChannelMapType struct {
-	slackToDiscord map[string]string
-	discordToSlack map[string]string
-	slackIDByName map[string]string
-	slackNameByID map[string]string
+	slackToDiscord   map[string]string
+	discordToSlack   map[string]string
+	slackIDByName    map[string]string
+	slackNameByID    map[string]string
 	discordIDBylName map[string]string
-	discordNameByID map[string]string
-	slackSuffix string
-	discordSuffix string
-	lastUpdated time.Time
-	mu sync.RWMutex
+	discordNameByID  map[string]string
+	slackSuffix      string
+	discordSuffix    string
+	lastUpdated      time.Time
+	mu               sync.RWMutex
 }
 
 const ChannelMapUpdateIntervals time.Duration = 20 * time.Second
 
-func (c *ChannelMapType) SlackToDiscord(slackID string) string {
+func NewChannelMap(slackToken, discordToken string) *ChannelMap {
+	discord, _ := discordgo.New("Bot " + discordToken)
+	return &ChannelMap{
+		slack:   slack.New(slackToken),
+		discord: discord,
+
+		slackToDiscord:   map[string]string{},
+		discordToSlack:   map[string]string{},
+		slackIDByName:    map[string]string{},
+		slackNameByID:    map[string]string{},
+		discordIDBylName: map[string]string{},
+		discordNameByID:  map[string]string{},
+	}
+}
+
+func (c *ChannelMap) SlackToDiscord(slackID string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.slackToDiscord[slackID]
 }
-func (c *ChannelMapType) DiscordToSlack(discordID string, createIfNotExist bool) string {
+func (c *ChannelMap) DiscordToSlack(discordID string, createIfNotExist bool) string {
 	channel := func() string {
 		c.mu.RLock()
 		defer c.mu.RUnlock()
-		return c.discordToSlack[discordID];
+		return c.discordToSlack[discordID]
 	}()
 	if channel != "" {
 		return channel
@@ -56,10 +65,10 @@ func (c *ChannelMapType) DiscordToSlack(discordID string, createIfNotExist bool)
 	}
 	return ""
 }
-func (c *ChannelMapType) CreateChannel(name string) string {
+func (c *ChannelMap) CreateChannel(name string) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	channel, err := Slack.api.CreateConversation(name, false)
+	channel, err := c.slack.CreateConversation(name, false)
 	if err != nil {
 		fmt.Printf("Error creating conversation: %v\n", err)
 		return ""
@@ -69,12 +78,12 @@ func (c *ChannelMapType) CreateChannel(name string) string {
 	return channel.ID
 }
 
-func (c *ChannelMapType) generateMap() {
+func (c *ChannelMap) generateMap() {
 	for slackName, slackID := range c.slackIDByName {
 		if strings.HasSuffix(slackName, c.slackSuffix) {
 			slackNamePrefix := strings.TrimSuffix(slackName, c.slackSuffix)
 			discordName := fmt.Sprintf("%s%s", slackNamePrefix, c.discordSuffix)
-			discordID, ok := c.discordIDBylName[discordName];
+			discordID, ok := c.discordIDBylName[discordName]
 			if ok {
 				c.slackToDiscord[slackID] = discordID
 				c.discordToSlack[discordID] = slackID
@@ -83,14 +92,14 @@ func (c *ChannelMapType) generateMap() {
 	}
 }
 
-func (c *ChannelMapType) FetchSlackChannels(s *SlackHandler) {
+func (c *ChannelMap) FetchSlackChannels() {
 	cursor := ""
 	for {
 		var err error
 		var channels []slack.Channel
-		channels, cursor, err = s.api.GetConversations(&slack.GetConversationsParameters{
+		channels, cursor, err = c.slack.GetConversations(&slack.GetConversationsParameters{
 			Cursor: cursor,
-			Limit: 1000,
+			Limit:  1000,
 		})
 		if err != nil {
 			fmt.Printf("Error fetchSlackChannels: %v", err)
@@ -106,8 +115,8 @@ func (c *ChannelMapType) FetchSlackChannels(s *SlackHandler) {
 	}
 }
 
-func (c *ChannelMapType) FetchDiscordChannel(d *DiscordHandler, guildID string) {
-	channels, _ := d.Session.GuildChannels(guildID)
+func (c *ChannelMap) FetchDiscordChannel(guildID string) {
+	channels, _ := c.discord.GuildChannels(guildID)
 
 	for _, channel := range channels {
 		if channel.Type != discordgo.ChannelTypeGuildText {
@@ -118,18 +127,18 @@ func (c *ChannelMapType) FetchDiscordChannel(d *DiscordHandler, guildID string) 
 	}
 }
 
-func (c *ChannelMapType) UpdateChannels(guildID string, slackSuffix string, discordSuffix string) {
+func (c *ChannelMap) UpdateChannels(guildID string, slackSuffix string, discordSuffix string) {
 	c.slackSuffix = slackSuffix
 	c.discordSuffix = discordSuffix
 	now := time.Now()
-	if (now.Sub(c.lastUpdated) < ChannelMapUpdateIntervals) {
+	if now.Sub(c.lastUpdated) < ChannelMapUpdateIntervals {
 		return
 	}
 	c.lastUpdated = now
 
 	defer func() {
-		c.FetchSlackChannels(Slack)
-		c.FetchDiscordChannel(Discord, guildID)
+		c.FetchSlackChannels()
+		c.FetchDiscordChannel(guildID)
 
 		c.mu.Lock()
 		defer c.mu.Unlock()

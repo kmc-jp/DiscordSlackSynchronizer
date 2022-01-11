@@ -28,12 +28,7 @@ type Token struct {
 }
 
 var Tokens Token
-
 var SettingsFile string
-
-var Slack *SlackHandler
-var Discord *DiscordHandler
-var Gyazo *GyazoHandler
 
 const ProgramName = "DiscordSlackSync"
 
@@ -49,6 +44,8 @@ func init() {
 }
 
 func main() {
+	var settings = NewSettingsHandler(Tokens.Slack.API, Tokens.Discord.API)
+
 	imager, err := slack_emoji_imager.New(Tokens.Slack.User, Tokens.Slack.API)
 	if err != nil {
 		fmt.Println("Imager initialize error:", err)
@@ -62,15 +59,22 @@ func main() {
 	var discordWebhookHandler = discord_webhook.New(Tokens.Discord.API)
 	var slackWebhookHandler = slack_webhook.New(Tokens.Slack.API)
 
-	var slackReactionHandler = NewSlackReactionHandler(slackWebhookHandler, discordWebhookHandler)
+	var slackReactionHandler = NewSlackReactionHandler(slackWebhookHandler, discordWebhookHandler, settings)
 	slackReactionHandler.SetReactionImager(imager)
 
-	var discordReacionHandler = NewDiscordReactionHandler(slackWebhookHandler, discordWebhookHandler)
+	var discordReacionHandler = NewDiscordReactionHandler(slackWebhookHandler, discordWebhookHandler, settings)
 
-	Discord = NewDiscordBot(Tokens.Discord.API)
+	var Discord = NewDiscordBot(Tokens.Discord.API, settings)
 	Discord.SetSlackWebhook(slackWebhookHandler)
 	Discord.SetDiscordWebhook(discordWebhookHandler)
 	Discord.SetDiscordReactionHandler(discordReacionHandler)
+
+	var Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event, settings)
+
+	Slack.SetUserToken(Tokens.Slack.User)
+	Slack.SetDiscordWebhook(discordWebhookHandler)
+	Slack.SetSlackWebhook(slackWebhookHandler)
+	Slack.SetReactionHandler(slackReactionHandler)
 
 	go func() {
 		// start Discord session
@@ -81,14 +85,6 @@ func main() {
 
 		fmt.Println("Discord session is now running.  Press CTRL-C to exit.")
 	}()
-
-	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)
-
-	Slack.SetUserToken(Tokens.Slack.User)
-	Slack.SetDiscordWebhook(discordWebhookHandler)
-	Slack.SetSlackWebhook(slackWebhookHandler)
-	Slack.SetReactionHandler(slackReactionHandler)
-
 	// start Slack session
 	go Slack.Do()
 

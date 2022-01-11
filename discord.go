@@ -34,9 +34,11 @@ type DiscordHandler struct {
 	slackHook         *slack_webhook.Handler
 
 	reactionHandler *DiscordReactionHandler
+
+	settings *SettingsHandler
 }
 
-func NewDiscordBot(apiToken string) *DiscordHandler {
+func NewDiscordBot(apiToken string, settings *SettingsHandler) *DiscordHandler {
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + Tokens.Discord.API)
 	if err != nil {
@@ -60,6 +62,7 @@ func NewDiscordBot(apiToken string) *DiscordHandler {
 	dg.AddHandler(d.ReactionRemoveAll)
 
 	d.slackLastMessages = SlackLastMessages{}
+	d.settings = settings
 
 	return &d
 }
@@ -91,7 +94,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		return
 	}
 
-	var sdt = findSlackChannel(m.ChannelID, m.GuildID)
+	var sdt = d.settings.FindSlackChannel(m.ChannelID, m.GuildID)
 	if sdt.SlackChannel == "" {
 		return
 	}
@@ -456,14 +459,14 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 			return
 		}
 		channels.Leave(vs.UserID)
-		setting := findSlackChannel(channel, vs.VoiceState.GuildID)
+		setting := d.settings.FindSlackChannel(channel, vs.VoiceState.GuildID)
 		if len(channels.Channels[channel].Users) == 0 {
 			d.sendVoiceState(setting, channels, VoiceEmptied)
 		} else {
 			d.sendVoiceState(setting, channels, VoiceLeft)
 		}
 	} else { // User joind or State changed
-		setting := findSlackChannel(vs.VoiceState.ChannelID, vs.VoiceState.GuildID)
+		setting := d.settings.FindSlackChannel(vs.VoiceState.ChannelID, vs.VoiceState.GuildID)
 		mem, err := s.GuildMember(vs.GuildID, vs.UserID)
 		if err != nil {
 			fmt.Printf("Failed to get info of a member: %v\n", err)

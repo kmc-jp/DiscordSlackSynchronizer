@@ -16,6 +16,15 @@ import (
 )
 
 func (s *Handler) FilesRemoteInfo(externalID, fileID string) (*slack.File, error) {
+	return s.filesRemoteRequest("info", externalID, fileID)
+}
+
+func (s *Handler) FilesRemoteRemove(externalID, fileID string) error {
+	_, err := s.filesRemoteRequest("remove", externalID, fileID)
+	return err
+}
+
+func (s *Handler) filesRemoteRequest(method, externalID, fileID string) (*slack.File, error) {
 	var req *http.Request
 
 	var value = make(url.Values)
@@ -28,7 +37,13 @@ func (s *Handler) FilesRemoteInfo(externalID, fileID string) (*slack.File, error
 		value.Set("file", fileID)
 	}
 
-	var reqURI = fmt.Sprintf("%s/files.remote.info?%s", SlackAPIEndpoint, value.Encode())
+	var reqURI string
+	switch method {
+	case "info":
+		reqURI = fmt.Sprintf("%s/files.remote.info?%s", SlackAPIEndpoint, value.Encode())
+	case "remove":
+		reqURI = fmt.Sprintf("%s/files.remote.remove?%s", SlackAPIEndpoint, value.Encode())
+	}
 
 	req, err := http.NewRequest("GET", reqURI, nil)
 	if err != nil {

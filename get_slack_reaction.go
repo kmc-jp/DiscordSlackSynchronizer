@@ -21,6 +21,8 @@ type SlackReactionHandler struct {
 	discordHook *discord_webhook.Handler
 	slackHook   *slack_webhook.Handler
 
+	settings *SettingsHandler
+
 	escaper MessageEscaper
 }
 
@@ -31,10 +33,11 @@ type ReactionImagerType interface {
 	GetEmojiURI(name string) string
 }
 
-func NewSlackReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler) *SlackReactionHandler {
+func NewSlackReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, settings *SettingsHandler) *SlackReactionHandler {
 	return &SlackReactionHandler{
 		slackHook:   slackHook,
 		discordHook: discordHook,
+		settings:    settings,
 	}
 }
 
@@ -49,7 +52,7 @@ func (d *SlackReactionHandler) SetMessageEscaper(escaper MessageEscaper) {
 func (d *SlackReactionHandler) GetReaction(channel string, timestamp string) error {
 	const ReactionGifName = "reactions.gif"
 
-	var cs, _ = findDiscordChannel(channel)
+	var cs, _ = d.settings.FindDiscordChannel(channel)
 	if !cs.Setting.SlackToDiscord {
 		return nil
 	}
@@ -154,21 +157,21 @@ next:
 	r, err := d.reactionImager.MakeReactionsImage(channel, timestamp)
 	switch err {
 	case nil:
-		break
+		dFiles = append(
+			dFiles,
+			discord_webhook.File{
+				FileName:    ReactionGifName,
+				Reader:      r,
+				ContentType: "image/gif",
+			},
+		)
 	case slack_emoji_imager.ErrorNoReactions:
-		_, err = d.discordHook.Edit(message.ChannelID, message.ID, message, dFiles)
-		return errors.Wrap(err, "EditSlackMessage")
+
 	default:
 		return errors.Wrap(err, "MakeReactionImage")
 	}
 
-	var file = discord_webhook.File{
-		FileName:    ReactionGifName,
-		Reader:      r,
-		ContentType: "image/gif",
-	}
-
-	newMessage, err := d.discordHook.Edit(message.ChannelID, message.ID, message, append(dFiles, file))
+	newMessage, err := d.discordHook.Edit(message.ChannelID, message.ID, message, dFiles)
 	if err != nil {
 		return errors.Wrap(err, "DiscordMessageEdit")
 	}
@@ -177,50 +180,75 @@ next:
 	for i, block := range srcContent.Blocks {
 		switch block.Type {
 		case "image":
+			var attachmentIndex int
+			var found bool
 			for j, oldAttachment := range oldAttachments {
-				if len(newMessage.Attachments) <= j || newMessage.Attachments[j].Filename != oldAttachment.Filename {
+				// find attachment of the image
+				if len(newMessage.Attachments) <= attachmentIndex || newMessage.Attachments[attachmentIndex].Filename != oldAttachment.Filename {
 					continue
 				}
-
 				if oldAttachment.URL != block.ImageURL {
 					continue
 				}
-
-				srcContent.Blocks[i] = slack_webhook.ImageBlock(newMessage.Attachments[j].URL, block.AltText)
-				srcContent.Blocks[i].Title = slack_webhook.ImageTitle(block.Title.Text, false)
+				found = true
+				attachmentIndex = j
+				break
 			}
+			if !found {
+				continue
+			}
+
+			srcContent.Blocks[i] = slack_webhook.ImageBlock(newMessage.Attachments[attachmentIndex].URL, block.AltText)
+			srcContent.Blocks[i].Title = slack_webhook.ImageTitle(block.Title.Text, false)
 		case "file":
+			var attachmentIndex int
+			var externalID string
+			var found bool
+
+			// find attachment of the file
 			for j, oldAttachment := range oldAttachments {
-				var externalID = fmt.Sprintf("%s:%s/%s", ProgramName, newMessage.ChannelID, oldAttachment.ID)
-
-				if block.ExternalID != externalID && len(newMessage.Attachments) <= j {
+				externalID = fmt.Sprintf("%s:%s/%s", ProgramName, newMessage.ChannelID, oldAttachment.ID)
+				if block.ExternalID != externalID || len(newMessage.Attachments) <= attachmentIndex {
 					continue
 				}
 
-				sFile, err := d.slackHook.FilesRemoteInfo(externalID, "")
-				if err != nil {
-					log.Printf("FilesRemoteInfo: %s\n", err.Error())
-					continue
-				}
+				attachmentIndex = j
+				found = true
 
-				externalID = fmt.Sprintf("%s:%s/%s", ProgramName, newMessage.ChannelID, newMessage.Attachments[j].ID)
-
-				_, err = d.slackHook.FilesRemoteAdd(
-					slack_webhook.FilesRemoteAddParameters{
-						ExternalURL: newMessage.Attachments[j].URL,
-						Title:       sFile.Title,
-						FileType:    sFile.Filetype,
-						ExternalID:  externalID,
-					},
-				)
-
-				if err != nil {
-					log.Printf("FilesRemoteAdd: %s\n", err.Error())
-					continue
-				}
-
-				srcContent.Blocks[i].ExternalID = externalID
+				break
 			}
+			if !found {
+				continue
+			}
+
+			sFile, err := d.slackHook.FilesRemoteInfo(externalID, "")
+			if err != nil {
+				log.Printf("FilesRemoteInfo: %s\n", err.Error())
+				continue
+			}
+
+			err = d.slackHook.FilesRemoteRemove(externalID, "")
+			if err != nil {
+				log.Printf("FilesRemoteRemove: %s\n", err.Error())
+			}
+
+			externalID = fmt.Sprintf("%s:%s/%s", ProgramName, newMessage.ChannelID, newMessage.Attachments[attachmentIndex].ID)
+
+			_, err = d.slackHook.FilesRemoteAdd(
+				slack_webhook.FilesRemoteAddParameters{
+					ExternalURL: newMessage.Attachments[attachmentIndex].URL,
+					Title:       sFile.Title,
+					FileType:    sFile.Filetype,
+					ExternalID:  externalID,
+				},
+			)
+
+			if err != nil {
+				log.Printf("FilesRemoteAdd: %s\n", err.Error())
+				continue
+			}
+
+			srcContent.Blocks[i].ExternalID = externalID
 		}
 	}
 

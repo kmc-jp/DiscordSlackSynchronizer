@@ -41,10 +41,12 @@ type SlackHandler struct {
 
 	workspaceURI string
 
+	settings *SettingsHandler
+
 	reactionHandler ReactionHandler
 }
 
-func NewSlackBot(apiToken, eventToken string) *SlackHandler {
+func NewSlackBot(apiToken, eventToken string, settings *SettingsHandler) *SlackHandler {
 	var slackBot SlackHandler
 
 	slackBot.api = slack.New(
@@ -61,6 +63,8 @@ func NewSlackBot(apiToken, eventToken string) *SlackHandler {
 
 	slackBot.apiToken = apiToken
 	slackBot.eventToken = eventToken
+
+	slackBot.settings = settings
 
 	res, _ := slackBot.api.AuthTest()
 	slackBot.workspaceURI = res.URL
@@ -137,7 +141,7 @@ func (s *SlackHandler) reactionHandle(channel string, timestamp string) {
 	if s.reactionHandler != nil {
 		err := s.reactionHandler.GetReaction(channel, timestamp)
 		if err != nil {
-			log.Println(err)
+			log.Println("GetReaction:", err)
 		}
 	}
 }
@@ -161,7 +165,7 @@ func (s *SlackHandler) emojiChangeHandle(ev *slackevents.EmojiChangedEvent) {
 }
 
 func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
-	var cs, discordID = findDiscordChannel(ev.Channel)
+	var cs, discordID = s.settings.FindDiscordChannel(ev.Channel)
 	//Confirm Slack to Discord setting
 	if !cs.Setting.SlackToDiscord {
 		return
@@ -216,38 +220,9 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		name = user.RealName
 	}
 
-	var message = discord_webhook.Message{
-		AvaterURL: user.Profile.ImageOriginal,
-		UserName:  name,
-		Message: &discordgo.Message{
-			GuildID:   discordID,
-			ChannelID: cs.DiscordChannel,
-			Content:   text,
-		},
-	}
-
-	// Send by webhook
-	newMessage, err := s.discordHook.Send(message.ChannelID, message, true, nil)
-	if err != nil {
-		log.Println(errors.Wrap(err, "ResendingMessage: "))
-		return
-	}
-
 	// send file links by webhook
 	for _, f := range files {
-		message = discord_webhook.Message{
-			AvaterURL: user.Profile.ImageOriginal,
-			UserName:  name,
-			Message: &discordgo.Message{
-				Content: f.PermalinkPublic,
-			},
-		}
-
-		newMessage, err = s.discordHook.Send(cs.DiscordChannel, message, true, nil)
-		if err != nil {
-			log.Println(errors.Wrap(err, "ResendingFileMessage: "))
-			return
-		}
+		text += "\n" + f.Permalink
 	}
 
 	var dFiles = []discord_webhook.File{}
@@ -260,16 +235,23 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 				ContentType: "image/" + f.info.Filetype,
 			})
 		}
-		message = discord_webhook.Message{
-			AvaterURL: user.Profile.ImageOriginal,
-			UserName:  name,
-		}
+	}
 
-		newMessage, err = s.discordHook.Send(cs.DiscordChannel, message, true, dFiles)
-		if err != nil {
-			log.Println(errors.Wrap(err, "ResendingFileMessage: "))
-			return
-		}
+	// Send by webhook
+	var message = discord_webhook.Message{
+		AvaterURL: user.Profile.ImageOriginal,
+		UserName:  name,
+		Message: &discordgo.Message{
+			GuildID:   discordID,
+			ChannelID: cs.DiscordChannel,
+			Content:   text,
+		},
+	}
+
+	newMessage, err := s.discordHook.Send(cs.DiscordChannel, message, true, dFiles)
+	if err != nil {
+		log.Println(errors.Wrap(err, "ResendingFileMessage: "))
+		return
 	}
 
 	// if user api token is provided, delete message and repost it.
@@ -292,7 +274,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 				_, err := s.hook.FilesRemoteAdd(
 					slack_webhook.FilesRemoteAddParameters{
 						Title:       file.Name,
-						ExternalURL: file.PermalinkPublic,
+						ExternalURL: file.Permalink,
 						ExternalID:  externalID,
 						FileType:    file.Filetype,
 					},

@@ -14,17 +14,20 @@ import (
 type DiscordReactionHandler struct {
 	discordHook *discord_webhook.Handler
 	slackHook   *slack_webhook.Handler
+
+	settings *SettingsHandler
 }
 
-func NewDiscordReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler) *DiscordReactionHandler {
+func NewDiscordReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, settings *SettingsHandler) *DiscordReactionHandler {
 	return &DiscordReactionHandler{
 		slackHook:   slackHook,
 		discordHook: discordHook,
+		settings:    settings,
 	}
 }
 
 func (d DiscordReactionHandler) GetReaction(guildID, channelID, messageID string) error {
-	var sdt = findSlackChannel(channelID, guildID)
+	var sdt = d.settings.FindSlackChannel(channelID, guildID)
 	if sdt.SlackChannel == "" {
 		return nil
 	}
