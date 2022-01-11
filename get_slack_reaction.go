@@ -15,13 +15,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-type DiscordReactionHandler struct {
-	token string
-
+type SlackReactionHandler struct {
 	reactionImager ReactionImagerType
 
-	hook      *discord_webhook.Handler
-	slackHook *slack_webhook.Handler
+	discordHook *discord_webhook.Handler
+	slackHook   *slack_webhook.Handler
 
 	escaper MessageEscaper
 }
@@ -33,29 +31,22 @@ type ReactionImagerType interface {
 	GetEmojiURI(name string) string
 }
 
-func NewDiscordReactionHandler(token string) *DiscordReactionHandler {
-	return &DiscordReactionHandler{
-		token: token,
+func NewSlackReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler) *SlackReactionHandler {
+	return &SlackReactionHandler{
+		slackHook:   slackHook,
+		discordHook: discordHook,
 	}
 }
 
-func (d *DiscordReactionHandler) SetReactionImager(imager ReactionImagerType) {
+func (d *SlackReactionHandler) SetReactionImager(imager ReactionImagerType) {
 	d.reactionImager = imager
 }
 
-func (d *DiscordReactionHandler) SetMessageEscaper(escaper MessageEscaper) {
+func (d *SlackReactionHandler) SetMessageEscaper(escaper MessageEscaper) {
 	d.escaper = escaper
 }
 
-func (d *DiscordReactionHandler) SetDiscordWebhook(hook *discord_webhook.Handler) {
-	d.hook = hook
-}
-
-func (d *DiscordReactionHandler) SetSlackWebhook(hook *slack_webhook.Handler) {
-	d.slackHook = hook
-}
-
-func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) error {
+func (d *SlackReactionHandler) GetReaction(channel string, timestamp string) error {
 	const ReactionGifName = "reactions.gif"
 
 	var cs, _ = findDiscordChannel(channel)
@@ -75,7 +66,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 		var sepMessage = strings.Split(srcContent.Text, "<"+SlackMessageDummyURI)
 		var messageTS = strings.Split(sepMessage[len(sepMessage)-1], "|")[0]
 
-		messages, err := d.hook.GetMessages(cs.DiscordChannel, "")
+		messages, err := d.discordHook.GetMessages(cs.DiscordChannel, "")
 		if err != nil {
 			return err
 		}
@@ -105,7 +96,7 @@ func (d *DiscordReactionHandler) GetReaction(channel string, timestamp string) e
 next:
 	// if message not found, find by its message text
 	if message.Message == nil {
-		messages, err := d.hook.GetMessages(cs.DiscordChannel, "")
+		messages, err := d.discordHook.GetMessages(cs.DiscordChannel, "")
 		if err != nil {
 			return err
 		}
@@ -165,7 +156,7 @@ next:
 	case nil:
 		break
 	case slack_emoji_imager.ErrorNoReactions:
-		_, err = d.hook.Edit(message.ChannelID, message.ID, message, dFiles)
+		_, err = d.discordHook.Edit(message.ChannelID, message.ID, message, dFiles)
 		return errors.Wrap(err, "EditSlackMessage")
 	default:
 		return errors.Wrap(err, "MakeReactionImage")
@@ -177,7 +168,7 @@ next:
 		ContentType: "image/gif",
 	}
 
-	newMessage, err := d.hook.Edit(message.ChannelID, message.ID, message, append(dFiles, file))
+	newMessage, err := d.discordHook.Edit(message.ChannelID, message.ID, message, append(dFiles, file))
 	if err != nil {
 		return errors.Wrap(err, "DiscordMessageEdit")
 	}
@@ -238,14 +229,14 @@ next:
 	return errors.Wrap(err, "UpdateSlackMessage")
 }
 
-func (d *DiscordReactionHandler) AddEmoji(name, value string) {
+func (d *SlackReactionHandler) AddEmoji(name, value string) {
 	d.reactionImager.AddEmoji(name, value)
 }
 
-func (d *DiscordReactionHandler) RemoveEmoji(name string) {
+func (d *SlackReactionHandler) RemoveEmoji(name string) {
 	d.reactionImager.RemoveEmoji(name)
 }
 
-func (d *DiscordReactionHandler) GetEmojiURI(name string) string {
+func (d *SlackReactionHandler) GetEmojiURI(name string) string {
 	return d.reactionImager.GetEmojiURI(name)
 }

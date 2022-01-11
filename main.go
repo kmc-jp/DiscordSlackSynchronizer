@@ -59,18 +59,18 @@ func main() {
 		return
 	}
 
-	var DiscordWebhook = discord_webhook.New(Tokens.Discord.API)
-
-	var discordReactionHandler = NewDiscordReactionHandler(Tokens.Discord.API)
-	discordReactionHandler.SetReactionImager(imager)
-	discordReactionHandler.SetDiscordWebhook(DiscordWebhook)
-
+	var discordWebhookHandler = discord_webhook.New(Tokens.Discord.API)
 	var slackWebhookHandler = slack_webhook.New(Tokens.Slack.API)
-	discordReactionHandler.SetSlackWebhook(slackWebhookHandler)
+
+	var slackReactionHandler = NewSlackReactionHandler(slackWebhookHandler, discordWebhookHandler)
+	slackReactionHandler.SetReactionImager(imager)
+
+	var discordReacionHandler = NewDiscordReactionHandler(slackWebhookHandler, discordWebhookHandler)
 
 	Discord = NewDiscordBot(Tokens.Discord.API)
 	Discord.SetSlackWebhook(slackWebhookHandler)
-	Discord.SetDiscordWebhook(DiscordWebhook)
+	Discord.SetDiscordWebhook(discordWebhookHandler)
+	Discord.SetDiscordReactionHandler(discordReacionHandler)
 
 	go func() {
 		// start Discord session
@@ -84,15 +84,15 @@ func main() {
 
 	Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event)
 
-	Slack.SetReactionHandler(discordReactionHandler)
-	Slack.SetDiscordWebhook(DiscordWebhook)
-	Slack.SetSlackWebhook(slackWebhookHandler)
 	Slack.SetUserToken(Tokens.Slack.User)
+	Slack.SetDiscordWebhook(discordWebhookHandler)
+	Slack.SetSlackWebhook(slackWebhookHandler)
+	Slack.SetReactionHandler(slackReactionHandler)
 
 	// start Slack session
 	go Slack.Do()
 
-	discordReactionHandler.SetMessageEscaper(Slack)
+	slackReactionHandler.SetMessageEscaper(Slack)
 
 	var sockType = os.Getenv("SOCK_TYPE")
 	var listenAddr = os.Getenv("LISTEN_ADDRESS")
@@ -110,7 +110,7 @@ func main() {
 			for command := range controller {
 				switch command {
 				case configurator.CommandRestart:
-					DiscordWebhook.Reset()
+					discordWebhookHandler.Reset()
 				default:
 					continue
 				}

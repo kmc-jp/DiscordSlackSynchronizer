@@ -70,6 +70,7 @@ groups:history
 groups:read
 
 reactions:read
+
 remote_files:write
 remote_files:read
 
@@ -89,8 +90,9 @@ Slackの該当チャンネルルに該当Botを招待
 さらに、次の環境変数を追加する必要がある。
 
 ```
-SLACK_API_TOKEN=xoxb-SlackToken
-SLACK_EVENT_TOKEN=*****
+SLACK_API_TOKEN=xoxb-xoxb-*****
+SLACK_API_USER_TOKEN=xoxp-*****
+SLACK_EVENT_TOKEN=xapp-*****
 
 DISCORD_BOT_TOKEN=Discord Bot Token
 ```
