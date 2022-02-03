@@ -105,7 +105,7 @@ all-allは現在1slack-discord関係にしか対応していません。
 ```
 [
   {
-    "discord_server": "768433410006974465",
+    "discord_server": "*****************",
     "slack_suffix": "-discord",
       {
         "slack": "all",
