@@ -145,9 +145,11 @@ LISTEN_ADDRESS=Listen addr
 STATE_DIRECTORY=/var/lib/...(例)
 ```
 
-## DiscordPrimaryPluginInterface
+## DiscordPrimaryIDPluginInterface
 
-メッセージの編集を、作成者のみが行えるように、Discordのメッセージ送信時、初期状態ではメッセージの送信者名の後に、Discordのユーザ番号を付加することで、メッセージの送信者情報を保持します。
+このBotでは、`DISCORD_ENABLE_MODIFY_MESSAGES=yes` を設定することで、ユーザによるメッセージの編集を許可できます。
+
+この機能において、メッセージの編集を作成者のみが行えるように、Discordのメッセージ送信時、初期状態ではメッセージの送信者名の後に、Discordのユーザ番号を付加することで、メッセージの送信者情報を保持します。
 
 もし、利用するコミュニティに於いて、ユーザに対して一意に定まるユーザID(以下PrimaryID)が別に存在する場合、それを用いることもできます。
 
