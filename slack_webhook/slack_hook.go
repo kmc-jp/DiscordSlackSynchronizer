@@ -20,19 +20,24 @@ import (
 const SlackAPIEndpoint = "https://slack.com/api"
 
 type Handler struct {
-	token string
+	token    string
+	Identity BasicIdentity
 }
 
 //HookMessage SlackにIncommingWebhook経由のMessage送信形式
 type Message struct {
-	TS          string       `json:"ts,omitempty"`
-	Channel     string       `json:"channel"`
+	TS      string `json:"ts,omitempty"`
+	Channel string `json:"channel"`
+
+	Type string `json:"type,omitempty"`
+
 	Text        string       `json:"text,omitempty"`
 	Blocks      []BlockBase  `json:"blocks,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
 
 	LinkNames bool   `json:"link_names,omitempty"`
 	Username  string `json:"username,omitempty"`
+	User      string `json:"user,omitempty"`
 	AsUser    bool   `json:"as_user,omitempty"`
 
 	Parse           string `json:"parse,omitempty"`
@@ -128,7 +133,12 @@ type UnfURL struct {
 }
 
 func New(token string) *Handler {
-	return &Handler{token}
+	var handler = &Handler{token: token}
+
+	identity, _ := handler.AuthTest()
+	handler.Identity = *identity
+
+	return handler
 }
 
 func (s *Handler) send(jsondataBytes []byte, method string) (string, error) {
@@ -204,12 +214,62 @@ func (s *Handler) GetMessages(channelID, timestamp string, limit int) ([]Message
 	requestAttr.Set("limit", strconv.Itoa(limit))
 	requestAttr.Set("inclusive", "true")
 
-	msgs, err := s.getMessages(requestAttr.Encode())
-	if err != nil {
-		return nil, errors.Wrap(err, "getMessages")
+	var hasMore = true
+	var messages = []Message{}
+	var cursor string
+
+	// get all messages while Slack sends "has_more" message
+	for hasMore {
+		if len(messages) >= limit {
+			break
+		}
+		requestAttr.Set("cursor", cursor)
+
+		req, _ := http.NewRequest("GET", SlackAPIEndpoint+"/conversations.history?"+requestAttr.Encode(), nil)
+
+		req.Header.Set("Authorization", "Bearer "+s.token)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("MessageSendError(Slack): %w", err)
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("readall: %w", err)
+		}
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("failed send slack: body: %s", body)
+		}
+
+		var r struct {
+			OK           bool      `json:"ok"`
+			Messages     []Message `json:"messages"`
+			HasMore      bool      `json:"has_more"`
+			ResponseMeta struct {
+				NextCursor string `json:"next_cursor"`
+			} `json:"response_metadata"`
+		}
+
+		err = json.Unmarshal(body, &r)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal: %w", err)
+		}
+		if !r.OK {
+			return nil, fmt.Errorf("failed send slack: body: %s", body)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		messages = append(messages, r.Messages...)
+		hasMore = r.HasMore
+		cursor = r.ResponseMeta.NextCursor
 	}
 
-	return msgs, nil
+	return messages, nil
 }
 
 func (s *Handler) GetMessage(channelID, timestamp string) (*Message, error) {
@@ -218,45 +278,6 @@ func (s *Handler) GetMessage(channelID, timestamp string) (*Message, error) {
 		return nil, errors.Wrap(err, "NotFound")
 	}
 	return &msgs[0], err
-}
-
-func (s *Handler) getMessages(query string) ([]Message, error) {
-	req, _ := http.NewRequest("GET", SlackAPIEndpoint+"/conversations.history?"+query, nil)
-
-	req.Header.Set("Authorization", "Bearer "+s.token)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("MessageSendError(Slack): %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("readall: %w", err)
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed send slack: body: %s", body)
-	}
-
-	var r struct {
-		OK       bool      `json:"ok"`
-		Messages []Message `json:"messages"`
-	}
-
-	err = json.Unmarshal(body, &r)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal: %w", err)
-	}
-	if !r.OK {
-		return nil, fmt.Errorf("failed send slack: body: %s", body)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return r.Messages, nil
 }
 
 func (s *Handler) FilesUpload(file File, channels ...string) (*slack.File, error) {
