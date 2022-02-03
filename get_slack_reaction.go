@@ -89,7 +89,7 @@ func (d *SlackReactionHandler) GetReaction(channel string, timestamp string) err
 			}
 
 			if t.UnixMilli() < srcT.UnixMilli() {
-				message.Message = &messages[i-1]
+				message = discord_webhook.FromDiscordgoMessage(&messages[i-1])
 				oldAttachments = messages[i-1].Attachments
 				break
 			}
@@ -98,7 +98,7 @@ func (d *SlackReactionHandler) GetReaction(channel string, timestamp string) err
 
 next:
 	// if message not found, find by its message text
-	if message.Message == nil {
+	if message.ID == "" {
 		messages, err := d.discordHook.GetMessages(cs.DiscordChannel, "")
 		if err != nil {
 			return err
@@ -112,14 +112,14 @@ next:
 		for i, msg := range messages {
 			if content == msg.Content {
 
-				message.Message = &messages[i]
+				message = discord_webhook.FromDiscordgoMessage(&messages[i-1])
 				break
 			}
 		}
 	}
 
 	// not found
-	if message.Message == nil {
+	if message.ID == "" {
 		return fmt.Errorf("MessageNotFound")
 	}
 
@@ -127,12 +127,8 @@ next:
 
 	message.Attachments = make([]discord_webhook.Attachment, 0)
 
-	for i := range message.Message.Attachments {
-		if message.Message.Attachments[i] == nil {
-			continue
-		}
-
-		var attach = message.Message.Attachments[i]
+	for i := range message.Attachments {
+		var attach = message.Attachments[i]
 		if attach.Filename == ReactionGifName {
 			// Reaction Gif should be renewed
 			continue

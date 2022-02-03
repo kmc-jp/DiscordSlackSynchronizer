@@ -36,6 +36,9 @@ type DiscordHandler struct {
 	reactionHandler *DiscordReactionHandler
 
 	settings *SettingsHandler
+	options  struct {
+		enableModify bool
+	}
 }
 
 func NewDiscordBot(apiToken string, settings *SettingsHandler) *DiscordHandler {
@@ -56,7 +59,7 @@ func NewDiscordBot(apiToken string, settings *SettingsHandler) *DiscordHandler {
 	d.regExp.refURI = regexp.MustCompile(`\(RefURI:\s<https:.+>\)`)
 
 	dg.AddHandler(d.voiceState)
-	dg.AddHandler(d.watch)
+	dg.AddHandler(d.getMessage)
 	dg.AddHandler(d.ReactionAdd)
 	dg.AddHandler(d.ReactionRemove)
 	dg.AddHandler(d.ReactionRemoveAll)
@@ -79,6 +82,10 @@ func (d *DiscordHandler) SetDiscordReactionHandler(handler *DiscordReactionHandl
 	d.reactionHandler = handler
 }
 
+func (d *DiscordHandler) EnableModify(state bool) {
+	d.options.enableModify = state
+}
+
 func (d *DiscordHandler) Close() error {
 	return d.Session.Close()
 }
@@ -87,9 +94,8 @@ func (d *DiscordHandler) Do() error {
 	return d.Session.Open()
 }
 
-func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate) {
+func (d *DiscordHandler) getMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore all messages created by the bot itself
-	// This isn't required in this specific example but it's a good practice.
 	if m.Author.ID == s.State.User.ID || m.Author.Bot {
 		return
 	}
@@ -115,8 +121,14 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		}
 
 		err = func() (err error) {
+			// check the option state
+			if !d.options.enableModify {
+				return errors.New("ModifyDisabled")
+			}
+
+			// check the message format
 			if !d.regExp.replace.MatchString(m.Content) {
-				return
+				return errors.New("NotMatch")
 			}
 
 			id, err := d.parseUserName(reference.Author)
@@ -131,7 +143,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 
 			var check bool
 			for _, id := range ids {
-				if id == m.Author.ID {
+				if id == m.Author.ID && id != "" {
 					check = true
 				}
 			}
@@ -144,27 +156,8 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 				log.Println(err)
 			}
 
-			var message discord_webhook.Message
-			message.Message = reference
+			var message = discord_webhook.FromDiscordgoMessage(reference)
 			message.Attachments = make([]discord_webhook.Attachment, 0)
-
-			for i := range message.Message.Attachments {
-				if message.Message.Attachments[i] == nil {
-					continue
-				}
-
-				var oldAtt = message.Message.Attachments[i]
-
-				message.Attachments = append(message.Attachments, discord_webhook.Attachment{
-					URL:      oldAtt.URL,
-					ID:       oldAtt.ID,
-					ProxyURL: oldAtt.ProxyURL,
-					Filename: oldAtt.Filename,
-					Width:    oldAtt.Width,
-					Height:   oldAtt.Height,
-					Size:     oldAtt.Size,
-				})
-			}
 
 			var newContent = reference.Content
 			var newContentSlice = strings.Split(newContent, "\n")
@@ -219,6 +212,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 
 			return
 		}()
+
 		if err == nil {
 			return
 		}
@@ -229,19 +223,29 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 		name = m.Author.Username
 	}
 
-	primaryID, err := dp.GetPrimaryID(m.Author.ID)
-	if err != nil {
-		log.Println(err)
-		primaryID = m.Author.ID
+	var username string
+	if d.options.enableModify {
+		// if modify function is enabled, add the author primary id to the message author name
+		primaryID, err := dp.GetPrimaryID(m.Author.ID)
+		if err != nil {
+			log.Println(err)
+			primaryID = m.Author.ID
+		}
+		if primaryID != "" {
+			username = fmt.Sprintf("%s(%s)", name, primaryID)
+		} else {
+			// if user does not have primary id, the user does not have permission to modify messages
+			username = name
+		}
+	} else {
+		username = name
 	}
 
 	var dMessage = discord_webhook.Message{
 		AvaterURL: m.Author.AvatarURL(""),
-		UserName:  fmt.Sprintf("%s(%s)", name, primaryID),
-		Message: &discordgo.Message{
-			ChannelID: m.ChannelID,
-			Content:   m.Content,
-		},
+		ChannelID: m.ChannelID,
+		UserName:  username,
+		Content:   m.Content,
 	}
 
 	var dFiles = []discord_webhook.File{}
@@ -297,7 +301,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	if err != nil {
 		log.Println(err)
 	} else {
-		// if it was successed, send message by webhook
+		// if it successed, send message by webhook
 		message, err := d.hook.Send(m.ChannelID, dMessage, false, dFiles)
 		if err != nil {
 			log.Printf("MessageSendError: %s", err)
@@ -342,6 +346,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	var content = m.Content
 
 	for _, id := range d.regExp.UserID.FindAllStringSubmatch(content, -1) {
+		// replace Slack User ids
 		if len(id) < 2 {
 			continue
 		}
@@ -359,6 +364,7 @@ func (d *DiscordHandler) watch(s *discordgo.Session, m *discordgo.MessageCreate)
 	}
 
 	for _, ch := range d.regExp.Channel.FindAllStringSubmatch(content, -1) {
+		// replace Slack channel names
 		if len(ch) < 2 {
 			continue
 		}

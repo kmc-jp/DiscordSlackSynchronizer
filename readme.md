@@ -95,6 +95,7 @@ SLACK_API_USER_TOKEN=xoxp-*****
 SLACK_EVENT_TOKEN=xapp-*****
 
 DISCORD_BOT_TOKEN=Discord Bot Token
+DISCORD_ENABLE_MODIFY_MESSAGES=yes/no # Discordのメッセージ編集の許可
 ```
 
 ## Discordの全チャンネルをSlackのそれぞれの同名のチャンネルに共有する

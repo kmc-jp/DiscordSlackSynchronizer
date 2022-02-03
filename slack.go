@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
@@ -241,11 +240,9 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	var message = discord_webhook.Message{
 		AvaterURL: user.Profile.ImageOriginal,
 		UserName:  name,
-		Message: &discordgo.Message{
-			GuildID:   discordID,
-			ChannelID: cs.DiscordChannel,
-			Content:   text,
-		},
+		GuildID:   discordID,
+		ChannelID: cs.DiscordChannel,
+		Content:   text,
 	}
 
 	newMessage, err := s.discordHook.Send(cs.DiscordChannel, message, true, dFiles)

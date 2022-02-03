@@ -68,6 +68,7 @@ func main() {
 	Discord.SetSlackWebhook(slackWebhookHandler)
 	Discord.SetDiscordWebhook(discordWebhookHandler)
 	Discord.SetDiscordReactionHandler(discordReacionHandler)
+	Discord.EnableModify(os.Getenv("DISCORD_ENABLE_MODIFY_MESSAGES") == "yes")
 
 	var Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event, settings)
 

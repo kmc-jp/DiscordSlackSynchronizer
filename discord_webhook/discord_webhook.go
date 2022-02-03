@@ -32,11 +32,33 @@ type File struct {
 }
 
 type Message struct {
-	*discordgo.Message
 	Components  []Component  `json:"components,omitempty"`
 	AvaterURL   string       `json:"avatar_url,omitempty"`
 	Attachments []Attachment `json:"attachments"`
 	UserName    string       `json:"username,omitempty"`
+
+	ID               string                        `json:"id"`
+	ChannelID        string                        `json:"channel_id"`
+	GuildID          string                        `json:"guild_id,omitempty"`
+	Content          string                        `json:"content"`
+	Timestamp        discordgo.Timestamp           `json:"timestamp"`
+	EditedTimestamp  discordgo.Timestamp           `json:"edited_timestamp"`
+	MentionRoles     []string                      `json:"mention_roles"`
+	TTS              bool                          `json:"tts"`
+	MentionEveryone  bool                          `json:"mention_everyone"`
+	Author           *discordgo.User               `json:"author"`
+	Embeds           []*discordgo.MessageEmbed     `json:"embeds"`
+	Mentions         []*discordgo.User             `json:"mentions"`
+	Reactions        []*discordgo.MessageReactions `json:"reactions"`
+	Pinned           bool                          `json:"pinned"`
+	Type             discordgo.MessageType         `json:"type"`
+	WebhookID        string                        `json:"webhook_id"`
+	Member           *discordgo.Member             `json:"member"`
+	MentionChannels  []*discordgo.Channel          `json:"mention_channels"`
+	Activity         *discordgo.MessageActivity    `json:"activity"`
+	Application      *discordgo.MessageApplication `json:"application"`
+	MessageReference *discordgo.MessageReference   `json:"message_reference"`
+	Flags            discordgo.MessageFlags        `json:"flags"`
 }
 
 type Component struct {
@@ -257,24 +279,19 @@ func (h *Handler) send(method, channelID, messageID string, message Message, wai
 
 	var responseAttr Message
 
-	var buf []byte
-	err = func() error {
-		defer func() {
-			dErr := recover()
-			if dErr != nil {
-				log.Println(err)
-			}
-		}()
+	buf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		errors.Wrap(err, "ReadResponseBody")
+		return
+	}
 
-		buf, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return errors.Wrap(err, "ReadResponseBody")
-		}
+	if len(buf) < 1 {
+		return &responseAttr, nil
+	}
 
-		return json.Unmarshal(buf, &responseAttr)
-	}()
+	err = json.Unmarshal(buf, &responseAttr)
 
-	return &responseAttr, errors.Wrapf(err, "JsonParsing\n%s", buf)
+	return &responseAttr, errors.Wrapf(err, "JsonParsing: %s", buf)
 }
 
 func (h *Handler) Get(channelID string) *discordgo.Webhook {
@@ -399,20 +416,13 @@ func (h *Handler) GetMessages(channelID string, around string) (messages []disco
 	}
 	defer resp.Body.Close()
 
+	body, err := ioutil.ReadAll(resp.Body)
+
 	var responseAttr []discordgo.Message
-	err = func() error {
-		defer func() {
-			err := recover()
-			if err != nil {
-				log.Println(err)
-				buf := new(bytes.Buffer)
-				io.Copy(buf, resp.Body)
-				fmt.Println(buf)
-			}
-		}()
-		return json.NewDecoder(resp.Body).Decode(&responseAttr)
-	}()
+
+	err = json.Unmarshal(body, &responseAttr)
 	if err != nil {
+		err = errors.Wrapf(err, "JsonUnmarshal: %s", body)
 		return
 	}
 
