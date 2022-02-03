@@ -517,9 +517,11 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 	if setting.SlackChannel == "" {
 		return
 	}
+
 	if !setting.Setting.SendVoiceState {
 		return
 	}
+
 	var blocks []slack_webhook.BlockBase
 	var err error
 	if setting.DiscordChannel == "all" {
@@ -539,6 +541,7 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 		}
 	}
 
+	var VoiceStateMessageText = fmt.Sprintf("VoiceStateMessage,%s", d.slackHook.Identity.UserID)
 	var message = slack_webhook.Message{
 		Channel:     setting.SlackChannel,
 		Username:    "Discord Watcher",
@@ -546,6 +549,7 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 		UnfurlLinks: false,
 		UnfurlMedia: false,
 		Blocks:      blocks,
+		Text:        VoiceStateMessageText,
 	}
 
 	switch event {
@@ -553,6 +557,18 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 		ts, ok := d.slackLastMessages[message.Channel]
 		if ok {
 			d.slackHook.Remove(message.Channel, ts)
+		} else {
+			// if not found a last message, find from message history
+			messages, err := d.slackHook.GetMessages(setting.SlackChannel, "", 100)
+			if err == nil {
+				for _, msg := range messages {
+					if msg.Text == VoiceStateMessageText {
+						// *bot cannot remove user messages and repost user messages contains DummyURIs
+						d.slackHook.Remove(message.Channel, msg.TS)
+						break
+					}
+				}
+			}
 		}
 
 		ts, err = d.slackHook.Send(message)
@@ -569,6 +585,18 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 			if ok {
 				delete(d.slackLastMessages, message.Channel)
 				d.slackHook.Remove(message.Channel, ts)
+			} else {
+				// if not found a last message, find from message history
+				messages, err := d.slackHook.GetMessages(setting.SlackChannel, "", 100)
+				if err == nil {
+					for _, msg := range messages {
+						if msg.Text == VoiceStateMessageText {
+							// *bot cannot remove user messages and repost user messages contains DummyURIs
+							d.slackHook.Remove(message.Channel, msg.TS)
+							break
+						}
+					}
+				}
 			}
 
 			ts, err = d.slackHook.Send(message)
@@ -590,7 +618,23 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 	case VoiceStateChanged:
 		ts, ok := d.slackLastMessages[message.Channel]
 		if !ok {
-			d.slackHook.Send(message)
+			// if not found a last message, find from message history
+			messages, err := d.slackHook.GetMessages(setting.SlackChannel, "", 100)
+			if err == nil {
+				func() {
+					for _, msg := range messages {
+						if msg.Text == VoiceStateMessageText {
+							// *repost user messages contains DummyURIs
+							ts = msg.TS
+							return
+						}
+					}
+					ts, err = d.slackHook.Send(message)
+					if err != nil {
+						log.Println(err)
+					}
+				}()
+			}
 		}
 
 		message.TS = ts
@@ -605,7 +649,22 @@ func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceC
 	case VoiceEmptied:
 		ts, ok := d.slackLastMessages[message.Channel]
 		if !ok {
-			return
+			// if not found a last message, find from message history
+			messages, err := d.slackHook.GetMessages(setting.SlackChannel, "", 100)
+			if err == nil {
+				for _, msg := range messages {
+					if msg.Text == VoiceStateMessageText {
+						// *repost user messages contains DummyURIs
+						ts = msg.TS
+						break
+					}
+				}
+			}
+			fmt.Println(ts)
+
+			if ts == "" {
+				return
+			}
 		}
 		delete(d.slackLastMessages, message.Channel)
 
