@@ -50,7 +50,6 @@ class ChannelSettings {
 }
 
 window.onload = async() => {
-    document.onclick = hide_menues;
     let save = document.querySelector("#save")
     save.onclick = async() => {
         if (!save.disabled) {
@@ -196,13 +195,6 @@ const get_guild_setting = async(guild_id) => {
     return Settings.find(setting => setting.discord_server == guild_id)
 }
 
-const hide_menues = () => {
-    let menues = document.querySelectorAll(".dropdown.menu")
-    for (let i = 0; i < menues.length; i++) {
-        document.body.removeChild(menues[i])
-    }
-}
-
 const isInWindow = (elem) => {
     let viewTop = window.scrollY;
     let viewBottom = window.scrollY + document.documentElement.clientHeight;
@@ -254,10 +246,16 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         slack_channel_list = await get_slack_channels();
     }
 
-    let accordion_div = document.querySelector("#channels");
+    const add_setting = document.querySelector("#add");
+    add_setting.onclick = event => {
+        settings.channel.push(new ChannelSettings({ "Setting": {} }))
+            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
+    };
+        
+    const accordion_div = document.querySelector("#channels");
     accordion_div.innerHTML = "";
 
-    let settings = await get_guild_setting(guild_id)
+    const settings = await get_guild_setting(guild_id)
     let settings_index = 0;
 
     const template_channel = document.querySelector("#template-channel").content;
@@ -404,7 +402,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         }
         
         // MuteState
-        let mute_state_input = setting_channel.querySelector(`.send-mute-state-setting`);
+        const mute_state_input = setting_channel.querySelector(`.send-mute-state-setting`);
         mute_state_input.disabled = setting.SendVoiceState == false
         if (setting.SendMuteState) {
             mute_state_input.checked = "checked"
@@ -414,7 +412,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         }
 
         // Slack to Discord
-        let slack_to_discord_input = setting_channel.querySelector(`.slack-to-discord-setting`);
+        const slack_to_discord_input = setting_channel.querySelector(`.slack-to-discord-setting`);
         if (setting.SlackToDiscord) {
             slack_to_discord_input.checked = "checked"
         }
@@ -423,7 +421,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         }
 
         // Discord to Slack
-        let discord_to_slack_input = setting_channel.querySelector(`.discord-to-slack-setting`);
+        const discord_to_slack_input = setting_channel.querySelector(`.discord-to-slack-setting`);
         if (setting.DiscordToSlack) {
             discord_to_slack_input.checked = "checked"
         }
@@ -432,7 +430,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         }
 
         // Appending Channel Name
-        let add_channel_name_input = setting_channel.querySelector(`.add-channel-name-setting`);
+        const add_channel_name_input = setting_channel.querySelector(`.add-channel-name-setting`);
         if (setting.ShowChannelName) {
             add_channel_name_input.checked = "checked"
         }
@@ -440,51 +438,14 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
             this_setting.ShowChannelName = event.target.checked == true
         }
 
+        const remove_button = setting_channel.querySelector(".remove-setting");
+        remove_button.onclick = () => {
+            settings.channel.splice(index, 1);
+            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
+        }
 
         accordion_div.appendChild(setting_channel);
 
         settings_index += 1;
-        /*
-        // 右クリックのメニュー生成
-        let onclick_menu = document.createElement("table");
-        onclick_menu.class = "dropdown menu"
-        onclick_menu.style.display = "none";
-        onclick_menu.className = "dropdown menu";
-        onclick_menu.style.backgroundColor = "white";
-
-        let onclick_menu_add = document.createElement("tr");
-        onclick_menu_add.className = "dropdown item";
-        onclick_menu_add.innerHTML = "<td><i class='fas fa-plus'></i></td><td>Add</td>";
-        onclick_menu_add.style.textAlign = "left";
-        onclick_menu_add.onclick = (index => event => {
-            settings.channel.splice(index, 0, new ChannelSettings({ "Setting": {} }))
-            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
-        })(settings_index)
-
-        let onclick_menu_delete = document.createElement("tr");
-        onclick_menu_delete.className = "dropdown item";
-        onclick_menu_delete.style.color = "Red";
-        onclick_menu_delete.innerHTML = "<td><i class='fas fa-trash-alt'></i></td><td>Delete</td>";
-        onclick_menu_delete.style.textAlign = "left";
-        onclick_menu_delete.onclick = (index => () => {
-            settings.channel.splice(index, 1);
-            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
-        })(settings_index)
-
-        onclick_menu.appendChild(onclick_menu_add);
-        onclick_menu.appendChild(onclick_menu_delete);
-
-        h2.oncontextmenu = (onclick_menu => event => {
-            event.preventDefault();
-            hide_menues();
-            onclick_menu.style.left = event.pageX + "px";
-            onclick_menu.style.top = event.pageY + "px";
-            onclick_menu.style.display = "unset";
-            if (!isInWindow(onclick_menu)) {
-                onclick_menu.style.top = window.scrollY + document.documentElement.clientHeight - onclick_menu.getBoundingClientRect().height + "px";
-            }
-            document.body.appendChild(onclick_menu);
-        })(onclick_menu)
-        */
     }
 }

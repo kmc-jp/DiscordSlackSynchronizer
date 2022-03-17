@@ -53,6 +53,7 @@
                     <option selected>Discord Guild...</option>
                 </select>
                 <button type="submit" class="btn btn-danger" id="save" disabled>Save</button>
+                <button class="btn btn-primary float-end" id="add"><i class='fas fa-plus'></i>設定</button>
             </div>
             <div class="accordion accordion-flush" id="channels">
 
@@ -69,12 +70,13 @@
             <h2 class="accordion-header">
                 <button class="accordion-button accordion-setting" data-bs-toggle="collapse" data-bs-target="#setting-inner-xxx" aria-expanded="false">
                     <i class="button-icon-setting fas"></i><span class="button-title-setting"></span>
+
                 </button>
             </h2>
             <div class="setting-inner accordion-collapse collapse">
                 <div class="accordion-body">
-                    <div class="row g-2">
-                        <div class="col-md">
+                    <div class="row">
+                        <div class="col-md-5">
                             <div>
                                 <label>
                                     Discord Channel Name
@@ -84,7 +86,7 @@
                                 </label>
                             </div>
                         </div>
-                        <div class="col-md">
+                        <div class="col-md-5">
                             <div>
                                 <label>
                                     Slack Channel Name
@@ -93,6 +95,9 @@
                                     </select>
                                 </label>
                             </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-danger remove-setting"><i class='fas fa-trash-alt'></i>削除</button>
                         </div>
                     </div>
                     <div class="form-check">
