@@ -182,9 +182,7 @@ ID
 
 ### noto-emoji
 
-© 2021 The M+ FONTS Project Authors
-
-Google Inc.
+© Google Inc.
 Arjen Nienhuis <a.g.nienhuis@gmail.com>
 
 [LICENSE](noto-emoji_LICENSE)
