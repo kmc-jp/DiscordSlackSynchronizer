@@ -50,7 +50,6 @@ class ChannelSettings {
 }
 
 window.onload = async() => {
-    document.onclick = hide_menues;
     let save = document.querySelector("#save")
     save.onclick = async() => {
         if (!save.disabled) {
@@ -196,13 +195,6 @@ const get_guild_setting = async(guild_id) => {
     return Settings.find(setting => setting.discord_server == guild_id)
 }
 
-const hide_menues = () => {
-    let menues = document.querySelectorAll(".dropdown.menu")
-    for (let i = 0; i < menues.length; i++) {
-        document.body.removeChild(menues[i])
-    }
-}
-
 const isInWindow = (elem) => {
     let viewTop = window.scrollY;
     let viewBottom = window.scrollY + document.documentElement.clientHeight;
@@ -254,452 +246,205 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         slack_channel_list = await get_slack_channels();
     }
 
-    let accordion_div = document.querySelector("#channels");
+    const add_setting = document.querySelector("#add");
+    add_setting.onclick = event => {
+        settings.channel.push(new ChannelSettings({ "Setting": {} }))
+            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
+    };
+        
+    const accordion_div = document.querySelector("#channels");
     accordion_div.innerHTML = "";
 
-    let settings = await get_guild_setting(guild_id)
+    const settings = await get_guild_setting(guild_id)
     let settings_index = 0;
 
+    const template_channel = document.querySelector("#template-channel").content;
     for (let setting of settings.channel) {
-        // 右クリックのメニュー生成
-        let onclick_menu = document.createElement("table");
-        onclick_menu.class = "dropdown menu"
-        onclick_menu.style.display = "none";
-        onclick_menu.className = "dropdown menu";
-        onclick_menu.style.backgroundColor = "white";
+        const index = settings_index;
+        const setting_channel = template_channel.cloneNode(true);
+        const setting_id = `setting-${settings_index}`;
+        setting_channel.querySelector(".setting").id = setting_id;
 
-        let onclick_menu_add = document.createElement("tr");
-        onclick_menu_add.className = "dropdown item";
-        onclick_menu_add.innerHTML = "<td><i class='fas fa-plus'></i></td><td>Add</td>";
-        onclick_menu_add.style.textAlign = "left";
-        onclick_menu_add.onclick = (index => event => {
-            settings.channel.splice(index, 0, new ChannelSettings({ "Setting": {} }))
-            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
-        })(settings_index)
+        const inner_id =`setting-inner-${settings_index}`
+        setting_channel.querySelector(".setting-inner").id = inner_id;
 
-        let onclick_menu_delete = document.createElement("tr");
-        onclick_menu_delete.className = "dropdown item";
-        onclick_menu_delete.style.color = "Red";
-        onclick_menu_delete.innerHTML = "<td><i class='fas fa-trash-alt'></i></td><td>Delete</td>";
-        onclick_menu_delete.style.textAlign = "left";
-        onclick_menu_delete.onclick = (index => () => {
-            settings.channel.splice(index, 1);
-            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
-        })(settings_index)
 
-        onclick_menu.appendChild(onclick_menu_add);
-        onclick_menu.appendChild(onclick_menu_delete);
-
-        // 一段を作成
-        let accordion_item = document.createElement("div")
-        accordion_item.className = "accordion-item"
-
-        // メニュータイトル
-        let h2 = document.createElement("h2")
-        h2.className = "accordion-header"
-        h2.id = "channel-" + settings_index;
-
-        let button = document.createElement("button");
-        button.className = "accordion-button collapsed";
-        button.type = button;
-        button.setAttribute("data-bs-toggle", "collapse");
-        button.setAttribute("data-bs-target", "#setting-" + settings_index);
-        button.setAttribute("area-expanded", "false");
-        button.setAttribute("area-controls", "setting-" + settings_index);
-
-        h2.oncontextmenu = (onclick_menu => event => {
-            event.preventDefault();
-            hide_menues();
-            onclick_menu.style.left = event.pageX + "px";
-            onclick_menu.style.top = event.pageY + "px";
-            onclick_menu.style.display = "unset";
-            if (!isInWindow(onclick_menu)) {
-                onclick_menu.style.top = window.scrollY + document.documentElement.clientHeight - onclick_menu.getBoundingClientRect().height + "px";
-            }
-            document.body.appendChild(onclick_menu);
-        })(onclick_menu)
-
+        // タイトル
+        const accordion = setting_channel.querySelector(".accordion-setting");
+        accordion.setAttribute("data-bs-target", `#${inner_id}`)
+        accordion.setAttribute("aria-controls", inner_id);
+        
+        const span = setting_channel.querySelector(".button-title-setting");
+        const icon = setting_channel.querySelector(".button-icon-setting");
+        
         let discord_channel = discord_channel_list.find(chan => { return chan.id == setting.DiscordChannel });
-
         if (discord_channel !== undefined) {
             switch (discord_channel.type) {
-                case 0:
-                    {
-                        let icon = document.createElement("i");
-                        icon.className = "fas fa-hashtag";
-
-                        let span = document.createElement("span");
-                        span.innerText = discord_channel.name;
-                        span.id = "button-title-" + settings_index
-
-                        button.appendChild(icon);
-                        button.appendChild(span);
-
-                    }
+                case 0:                        
+                    icon.classList.add("fa-hashtag");
+                    span.innerText = discord_channel.name;
                     break;
                 case 2:
-                    {
-                        let icon = document.createElement("i");
-                        icon.className = "fas fa-volume-up";
-
-                        let span = document.createElement("span");
-                        span.innerText = discord_channel.name;
-                        span.id = "button-title-" + settings_index
-
-                        button.appendChild(icon);
-                        button.appendChild(span);
-
-                    }
+                    icon.classList.add("fa-volume-up");
+                    span.innerText = discord_channel.name;
                     break;
                 default:
-                    {
-                        let icon = document.createElement("i");
-                        icon.className = "fas fa-hashtag";
-
-                        let span = document.createElement("span");
-                        span.innerText = discord_channel.name;
-                        span.id = "button-title-" + settings_index
-
-                        button.appendChild(icon);
-                        button.appendChild(span);
-                    }
+                    icon.classList.add("fa-hashtag");
+                    span.innerText = discord_channel.name;
+                    break;
                     break;
             }
         } else {
-            let icon = document.createElement("i");
-            icon.className = "fas fa-hashtag";
-
-            let span = document.createElement("span");
+            icon.classList.add("fa-hashtag");
             span.innerText = "New Setting";
-            span.id = "button-title-" + settings_index
-
-            button.appendChild(icon);
-            button.appendChild(span);
         }
-
-        h2.appendChild(button);
-        accordion_item.appendChild(h2);
-
-        // 本質
-        let accordion_collapse = document.createElement("div")
-        accordion_collapse.id = "setting-" + settings_index;
-        accordion_collapse.className = "accordion-collapse collapse";
-        accordion_collapse.setAttribute("aria-labelledby", "channel-01");
-        accordion_collapse.setAttribute("data-bs-parent", "#channels");
-
-        let accordion_body = document.createElement("div");
-        accordion_body.className = "accordion-body";
-
-        // Channel情報の入力欄
-        let settings_row = document.createElement("div");
-        settings_row.className = "row g-2";
-
-        // Discord
-        let discord_channel_col = document.createElement("div");
-        discord_channel_col.className = "col-md";
-
-        let discord_channel_formfloat = document.createElement("div");
-        discord_channel_formfloat.className = "form-floating";
-
-        let input_discord_channel_label = document.createElement("label")
-        input_discord_channel_label.setAttribute("for", "discord-channel-" + settings_index)
-        input_discord_channel_label.innerText = "Discord Channel Name";
-
-        let select_discord = document.createElement("select");
-        // Discordのチャンネルの選択項目生成
-        select_discord.className = "form-select";
-        select_discord.id = "discord-channel-" + settings_index;
-        select_discord.setAttribute("aria-label", "discord-channel")
-
-        let make_discord_select = (index => (isTextChannel) => {
-            select_discord.innerHTML = "";
-            // select channelが空の時はSelect...を選択
-            let option = document.createElement("option")
-
-            option.innerText = "Select..."
-            if (!setting.DiscordChannel) {
-                option.selected = true;
-                selected_discord_channel = option;
+        
+        const this_setting = setting;
+        
+        // Discordのチャンネルの選択項目
+        const select_discord = setting_channel.querySelector(".discord-channel-setting");
+        const isTextChannel = !(discord_channel && discord_channel.type !== 0);
+        const regenerate_select_discord = (select_discord, isTextChannel) => {
+            for (let option of select_discord.querySelectorAll("[data-discordid]")) {
+                select_discord.removeChild(option);
             }
-
-            select_discord.appendChild(option)
-
+            
+            let option = select_discord.querySelector("option")
+            if (!this_setting.DiscordChannel) {
+                option.selected = true;
+            }
+    
             for (channel of discord_channel_list) {
-                let option = document.createElement("option")
-                if (setting.DiscordChannel == channel.id) {
+                const option = document.createElement("option")
+                if (this_setting.DiscordChannel == channel.id) {
                     option.selected = true;
                 }
-
+    
                 if ((isTextChannel && channel.type === 0) || (!isTextChannel && channel.type === 2)) {
                     option.innerText = channel.name;
-                    option.setAttribute("discordid", channel.id)
+                    option.setAttribute("data-discordid", channel.id)
                     select_discord.appendChild(option)
                 }
             }
+        }
+        regenerate_select_discord(select_discord, isTextChannel)
 
-            select_discord.onchange = (event) => {
-                if (!event.target.value) {
-                    setting.Comment = "";
-                    setting.DiscordChannel = "";
-                    document.querySelector("#button-title-" + index).textContent = " NewSetting"
-                    return;
-                }
-                setting.Comment = "#" + event.target.value;
-                setting.DiscordChannel = event.target.options[event.target.selectedIndex].getAttribute("discordid");
-                document.querySelector("#button-title-" + index).innerText = event.target.value;
+        select_discord.onchange = (event) => {
+            if (!event.target.value) {
+                this_setting.Comment = "";
+                this_setting.DiscordChannel = "";
+                document.querySelector(`#${setting_id} .button-title-setting`).textContent = " NewSetting"
+                return;
             }
-        })(settings_index)
+            this_setting.Comment = "#" + event.target.value;
+            this_setting.DiscordChannel = event.target.options[event.target.selectedIndex].getAttribute("data-discordid");
+            document.querySelector(`#${setting_id} .button-title-setting`).innerText = event.target.value;
+        };
 
 
-        make_discord_select(!(discord_channel && discord_channel.type !== 0));
-
-        discord_channel_formfloat.appendChild(select_discord);
-        discord_channel_formfloat.appendChild(input_discord_channel_label)
-
-        discord_channel_col.appendChild(discord_channel_formfloat);
-        settings_row.appendChild(discord_channel_col);
-
-
-        // Slack
-        let slack_channel_col = document.createElement("div");
-        slack_channel_col.className = "col-md";
-
-        let slack_channel_formfloat = document.createElement("div");
-        slack_channel_formfloat.className = "form-floating";
-
-        let input_slack_channel_label = document.createElement("label")
-        input_slack_channel_label.setAttribute("for", "slack-channel-" + settings_index)
-        input_slack_channel_label.innerText = "Slack Channel Name";
-
-        let select_slack = document.createElement("select");
         // slackのチャンネルの選択項目生成
-        select_slack.className = "form-select";
-        select_slack.id = "slack-channel-" + settings_index;
-        select_slack.setAttribute("aria-label", "slack-channel")
+        const select_slack = setting_channel.querySelector(".slack-channel-setting");        
+        option = select_slack.querySelector("option")
+        if (!setting.SlackChannel) {
+            option.selected = true;
+        }
 
-        let make_slack_select = (index => () => {
-            select_slack.innerHTML = "";
-            // select channelが空の時はSelect...を選択
-            let option = document.createElement("option")
-
-            option.innerText = "Select..."
-            if (!setting.SlackChannel) {
+        for (channel of slack_channel_list) {
+            const option = document.createElement("option")
+            if (setting.SlackChannel == channel.id) {
                 option.selected = true;
             }
 
+            option.innerText = channel.name;
+            option.setAttribute("data-slackid", channel.id)
             select_slack.appendChild(option)
-
-            for (channel of slack_channel_list) {
-                let option = document.createElement("option")
-                if (setting.SlackChannel == channel.id) {
-                    option.selected = true;
-                }
-
-                option.innerText = channel.name;
-                option.setAttribute("slackid", channel.id)
-                select_slack.appendChild(option)
+        }
+        
+        select_slack.onchange = (event) => {
+            if (!event.target.value) {
+                setting.SlackChannel = "";
+                return;
             }
+            this_setting.SlackChannel = event.target.options[event.target.selectedIndex].getAttribute("data-slackid");
+        };
 
-            select_slack.onchange = (event) => {
-                if (!event.target.value) {
-                    setting.SlackChannel = "";
-                    return;
-                }
-                setting.SlackChannel = event.target.options[event.target.selectedIndex].getAttribute("slackid");
-            }
-        })(settings_index)
-
-        make_slack_select();
-
-        slack_channel_formfloat.appendChild(select_slack);
-        slack_channel_formfloat.appendChild(input_slack_channel_label)
-
-        slack_channel_col.appendChild(slack_channel_formfloat);
-        settings_row.appendChild(slack_channel_col);
-
-        accordion_body.appendChild(settings_row);
-
+        
         // チェック項目の作成
         // VoiceState
-        let voice_state_check = document.createElement("div");
-        voice_state_check.className = "form-check";
-
-        let voice_state_input = document.createElement("input");
-        voice_state_input.className = "form-check-input";
-        voice_state_input.type = "checkbox";
-        voice_state_input.id = "send-voice-state-" + settings_index;
-
+        const voice_state_input = setting_channel.querySelector(".send-voice-state-setting");
         if (setting.SendVoiceState) {
             voice_state_input.checked = "checked"
         }
 
-        voice_state_input.onchange = ((index, button) => {
-            return (event) => {
-                setting.SendVoiceState = event.target.checked == true
-                setting.DiscordChannel = "";
+        voice_state_input.onchange = (event) => {
+            this_setting.SendVoiceState = event.target.checked == true
+            this_setting.DiscordChannel = "";
+        
+            icon.classList.remove("fa-volume-up", "fa-hashtag");
+            const select_discord = document.querySelector(`#${setting_id} .discord-channel-setting`) 
+            if (!setting.SendVoiceState) {
+                regenerate_select_discord(select_discord, true);
+                icon.classList.add("fa-hashtag");
+                span.innerText = " NewSetting"
+            } else {
+                regenerate_select_discord(select_discord, false);
+                icon.classList.add("fa-volume-up");
+                span.innerText = " NewSetting"
+            }
 
-                button.innerHTML = "";
-
-                if (!setting.SendVoiceState) {
-                    make_discord_select(true);
-
-                    let icon = document.createElement("i");
-                    icon.className = "fas fa-hashtag";
-
-                    let span = document.createElement("span");
-                    span.innerText = " NewSetting"
-                    span.id = "button-title-" + index
-
-                    button.appendChild(icon);
-                    button.appendChild(span);
-                } else {
-                    make_discord_select(false);
-
-                    let icon = document.createElement("i");
-                    icon.className = "fas fa-volume-up";
-
-                    let span = document.createElement("span");
-                    span.innerText = " NewSetting"
-                    span.id = "button-title-" + index
-
-                    button.appendChild(icon);
-                    button.appendChild(span);
-                }
-
-                let mute_state = document.querySelector("#send-mute-state-" + index);
-                if (mute_state) {
-                    mute_state.disabled = setting.SendVoiceState == false;
-                    if (!setting.SendVoiceState) {
-                        mute_state.checked = false;
-                    }
+            const mute_state = document.querySelector(`#${setting_id} .send-mute-state-setting`);
+            if (mute_state) {
+                mute_state.disabled = this_setting.SendVoiceState == false;
+                if (!this_setting.SendVoiceState) {
+                    mute_state.checked = false;
                 }
             }
-        })(settings_index, button)
-
-        let voice_state_input_label = document.createElement("label");
-        voice_state_input_label.className = "form-check-label";
-        voice_state_input_label.setAttribute("for", "send-voice-state-" + settings_index);
-        voice_state_input_label.innerText = "ボイスチャンネルとして監視・送信"
-
-        voice_state_check.appendChild(voice_state_input);
-        voice_state_check.appendChild(voice_state_input_label);
-
-        accordion_body.appendChild(voice_state_check);
-
+        }
+        
         // MuteState
-        let mute_state_check = document.createElement("div");
-        mute_state_check.className = "form-check";
-
-        let mute_state_input = document.createElement("input");
-        mute_state_input.className = "form-check-input";
-        mute_state_input.type = "checkbox";
-        mute_state_input.id = "send-mute-state-" + settings_index;
-
+        const mute_state_input = setting_channel.querySelector(`.send-mute-state-setting`);
         mute_state_input.disabled = setting.SendVoiceState == false
-
         if (setting.SendMuteState) {
             mute_state_input.checked = "checked"
         }
-
         mute_state_input.onchange = (event) => {
-            setting.SendMuteState = event.target.checked == true
+            this_setting.SendMuteState = event.target.checked == true
         }
 
-        let mute_state_input_label = document.createElement("label");
-        mute_state_input_label.className = "form-check-label";
-        mute_state_input_label.setAttribute("for", "send-mute-state-" + settings_index);
-        mute_state_input_label.innerText = "ミュート／消音状態変化も通知";
-
-        mute_state_check.appendChild(mute_state_input);
-        mute_state_check.appendChild(mute_state_input_label);
-
-        accordion_body.appendChild(mute_state_check);
-
-        // Slack to Discord 
-        let slack_to_discord_check = document.createElement("div");
-        slack_to_discord_check.className = "form-check";
-
-        let slack_to_discord_input = document.createElement("input");
-        slack_to_discord_input.className = "form-check-input";
-        slack_to_discord_input.type = "checkbox";
-        slack_to_discord_input.id = "slack-to-discord-" + settings_index;
-
+        // Slack to Discord
+        const slack_to_discord_input = setting_channel.querySelector(`.slack-to-discord-setting`);
         if (setting.SlackToDiscord) {
             slack_to_discord_input.checked = "checked"
         }
-
         slack_to_discord_input.onchange = (event) => {
-            setting.SlackToDiscord = event.target.checked == true
+            this_setting.SlackToDiscord = event.target.checked == true
         }
 
-        let slack_to_discord_input_label = document.createElement("label");
-        slack_to_discord_input_label.className = "form-check-label";
-        slack_to_discord_input_label.setAttribute("for", "slack-to-discord-" + settings_index);
-        slack_to_discord_input_label.innerText = "SlackからDiscordへ転送"
-
-        slack_to_discord_check.appendChild(slack_to_discord_input);
-        slack_to_discord_check.appendChild(slack_to_discord_input_label);
-
-        accordion_body.appendChild(slack_to_discord_check);
-
         // Discord to Slack
-        let discord_to_slack_check = document.createElement("div");
-        discord_to_slack_check.className = "form-check";
-
-        let discord_to_slack_input = document.createElement("input");
-        discord_to_slack_input.className = "form-check-input";
-        discord_to_slack_input.type = "checkbox";
-        discord_to_slack_input.id = "discord-to-slack-" + settings_index;
-
+        const discord_to_slack_input = setting_channel.querySelector(`.discord-to-slack-setting`);
         if (setting.DiscordToSlack) {
             discord_to_slack_input.checked = "checked"
         }
-
         discord_to_slack_input.onchange = (event) => {
-            setting.DiscordToSlack = event.target.checked == true
+            this_setting.DiscordToSlack = event.target.checked == true
         }
 
-        let discord_to_slack_input_label = document.createElement("label");
-        discord_to_slack_input_label.className = "form-check-label";
-        discord_to_slack_input_label.setAttribute("for", "discord-to-slack-" + settings_index);
-
-        discord_to_slack_input_label.innerText = "DiscordからSlackへ転送"
-
-        discord_to_slack_check.appendChild(discord_to_slack_input);
-        discord_to_slack_check.appendChild(discord_to_slack_input_label);
-
-        accordion_body.appendChild(discord_to_slack_check);
-
-        let add_channel_name_check = document.createElement("div");
-        add_channel_name_check.className = "form-check";
-
-        let add_channel_name_input = document.createElement("input");
-        add_channel_name_input.className = "form-check-input";
-        add_channel_name_input.type = "checkbox";
-        add_channel_name_input.id = "add-channel-name-" + settings_index;
-
+        // Appending Channel Name
+        const add_channel_name_input = setting_channel.querySelector(`.add-channel-name-setting`);
         if (setting.ShowChannelName) {
             add_channel_name_input.checked = "checked"
         }
-
         add_channel_name_input.onchange = (event) => {
-            setting.ShowChannelName = event.target.checked == true
+            this_setting.ShowChannelName = event.target.checked == true
         }
 
-        let add_channel_name_input_label = document.createElement("label");
-        add_channel_name_input_label.className = "form-check-label";
-        add_channel_name_input_label.setAttribute("for", "add-channel-name-" + settings_index);
-        add_channel_name_input_label.innerText = "チャンネル名を付加"
+        const remove_button = setting_channel.querySelector(".remove-setting");
+        remove_button.onclick = () => {
+            settings.channel.splice(index, 1);
+            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
+        }
 
-
-        add_channel_name_check.appendChild(add_channel_name_input);
-        add_channel_name_check.appendChild(add_channel_name_input_label);
-
-        accordion_body.appendChild(add_channel_name_check);
-
-        accordion_collapse.appendChild(accordion_body);
-        accordion_item.appendChild(accordion_collapse);
-        accordion_div.appendChild(accordion_item);
+        accordion_div.appendChild(setting_channel);
 
         settings_index += 1;
     }

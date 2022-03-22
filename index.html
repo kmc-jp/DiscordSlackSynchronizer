@@ -52,7 +52,8 @@
                 <select class="form-select" aria-label="Discord Guild Selection" id="guild_select">
                     <option selected>Discord Guild...</option>
                 </select>
-                <button type="submit" class="btn btn-danger" id="save" disabled>Save</button>
+                <button type="submit" class="btn btn-danger" id="save" disabled><i class="fa-solid fa-floppy-disk"></i></button>
+                <button class="btn btn-light float-end" id="add"><i class='fas fa-plus'></i></button>
             </div>
             <div class="accordion accordion-flush" id="channels">
 
@@ -63,6 +64,73 @@
     <div class="card" id="your_account">
 
     </div>
+
+    <template id="template-channel">
+        <div class="accordion-item setting">
+            <h2 class="accordion-header">
+                <button class="accordion-button accordion-setting collapsed" data-bs-toggle="collapse" data-bs-target="#setting-inner-xxx" aria-expanded="false">
+                    <i class="button-icon-setting fas"></i><span class="button-title-setting"></span>
+
+                </button>
+            </h2>
+            <div class="setting-inner accordion-collapse collapse">
+                <div class="accordion-body">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="form-floating">
+                                <select class="form-select discord-channel-setting" id="discord-channel-setting">
+                                    <option>Select...</option>
+                                </select>
+                                <label for="discord-channel-setting">Discord Channel Name</label>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-floating">
+                                <select class="form-select slack-channel-setting" id="slack-channel-setting">
+                                    <option>Select...</option>
+                                </select>
+                                <label for="slack-channel-setting">Slack Channel Name</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-danger remove-setting"><i class='fas fa-trash-alt'></i></button>
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input class="form-check-input send-voice-state-setting" type="checkbox"">
+                            ボイスチャンネルとして監視・送信
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input class="form-check-input send-mute-state-setting" type="checkbox">
+                            ミュート／消音状態変化も通知
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                        <input class="form-check-input slack-to-discord-setting" type="checkbox">
+                            SlackからDiscordへ転送
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input class="form-check-input discord-to-slack-setting" type="checkbox">
+                            DiscordからSlackへ転送
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input class="form-check-input add-channel-name-setting" type="checkbox">
+                            チャンネル名を付加
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+    
 </body>
 
 </html>
