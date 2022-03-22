@@ -192,6 +192,7 @@ func (h *Handler) createChannelWebhook(channelID, name string) (*discordgo.Webho
 	}
 
 	req.Header.Set("Authorization", "Bot "+h.token)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
