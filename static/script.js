@@ -300,6 +300,28 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         }
         
         const this_setting = setting;
+
+        // 順序入れ替え
+        const button_up = setting_channel.querySelector(".btn-up-setting");
+        if (index < 1) {
+             button_up.disabled = true;
+        }
+        button_up.onclick = () => {
+            if (index < 1) return false;
+            settings.channel.splice(index - 1, 2, settings.channel[index], settings.channel[index - 1]);
+            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
+            return false;
+        }
+        const button_down = setting_channel.querySelector(".btn-down-setting");
+        if (index + 1 >= settings.channel.length) {
+            button_down.disabled = true;
+        }
+        button_down.onclick = () => {
+            if (index + 1 >= settings.channel.length) return false;
+            settings.channel.splice(index, 2, settings.channel[index + 1], settings.channel[index]);
+            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
+            return false;
+        }
         
         // Discordのチャンネルの選択項目
         const select_discord = setting_channel.querySelector(".discord-channel-setting");
