@@ -119,7 +119,7 @@ func (h *Handler) createWebhook(channelID string) *discordgo.Webhook {
 		return nil
 	}
 	if len(webhooks) == 0 {
-		webhook, err := h.createChannelWebhook(channelID, "Slack Synchronizer", "a")
+		webhook, err := h.createChannelWebhook(channelID, "Slack Synchronizer")
 		if err != nil {
 			fmt.Printf("Error creating webhook: %v\n", err)
 			return nil
@@ -151,14 +151,18 @@ func (h *Handler) getChannelWebhook(channelID string) ([]*discordgo.Webhook, err
 	}
 	defer resp.Body.Close()
 
+	buf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "ReadAll")
+	}
+
 	var webhook []*discordgo.Webhook
+	err = json.Unmarshal(buf, &webhook)
 
-	err = json.NewDecoder(resp.Body).Decode(&webhook)
-
-	return webhook, err
+	return webhook, errors.Wrap(err, "Unmarshal")
 }
 
-func (h *Handler) createChannelWebhook(method, channelID, name string) (*discordgo.Webhook, error) {
+func (h *Handler) createChannelWebhook(channelID, name string) (*discordgo.Webhook, error) {
 	var body = new(bytes.Buffer)
 	var req *http.Request
 	var err error
@@ -172,7 +176,7 @@ func (h *Handler) createChannelWebhook(method, channelID, name string) (*discord
 	}
 	err = json.NewEncoder(body).Encode(webhookOpt)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Encode")
 	}
 
 	req, err = http.NewRequest(
@@ -197,9 +201,14 @@ func (h *Handler) createChannelWebhook(method, channelID, name string) (*discord
 
 	var webhook discordgo.Webhook
 
-	err = json.NewDecoder(resp.Body).Decode(&webhook)
+	buf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "ReadAll")
+	}
 
-	return &webhook, err
+	err = json.Unmarshal(buf, &webhook)
+
+	return &webhook, errors.Wrap(err, "Unmarshal")
 }
 
 func (h *Handler) send(method, channelID, messageID string, message Message, wait bool, files []File) (newMessage *Message, err error) {
