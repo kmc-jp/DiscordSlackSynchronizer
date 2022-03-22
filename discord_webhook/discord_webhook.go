@@ -121,7 +121,7 @@ func (h *Handler) createWebhook(channelID string) *discordgo.Webhook {
 	if len(webhooks) == 0 {
 		webhook, err := h.createChannelWebhook(channelID, "Slack Synchronizer")
 		if err != nil {
-			fmt.Printf("Error creating webhook: %v\n", err)
+			fmt.Printf("Error: CreateChannelWebhook: %v\n", err)
 			return nil
 		}
 		return webhook
@@ -207,8 +207,14 @@ func (h *Handler) createChannelWebhook(channelID, name string) (*discordgo.Webho
 	}
 
 	err = json.Unmarshal(buf, &webhook)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Unmarshal: %s", buf)
+	}
+	if webhook.ID == "" {
+		return nil, errors.New(fmt.Sprintf("API: %s", buf))
+	}
 
-	return &webhook, errors.Wrap(err, "Unmarshal")
+	return &webhook, nil
 }
 
 func (h *Handler) send(method, channelID, messageID string, message Message, wait bool, files []File) (newMessage *Message, err error) {
