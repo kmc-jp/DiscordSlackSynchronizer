@@ -219,6 +219,14 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		name = user.RealName
 	}
 
+	var icon = user.Profile.ImageOriginal
+	if icon == "" {
+		icon = user.Profile.Image512
+	}
+	if icon == "" {
+		icon = user.Profile.Image192
+	}
+
 	// send file links by webhook
 	for _, f := range files {
 		text += "\n" + f.Permalink
@@ -290,7 +298,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 			}
 
 			var message = slack_webhook.Message{
-				IconURL:     user.Profile.ImageOriginal,
+				IconURL:     icon,
 				Username:    name,
 				Channel:     ev.Channel,
 				Text:        content,
