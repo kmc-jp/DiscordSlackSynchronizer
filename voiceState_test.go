@@ -37,7 +37,7 @@ func TestVoiceState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%s", block)
+	t.Logf("%+v", block)
 
 	voiceChannels.Muted(memberID1)
 	if !voiceChannels.Channels[channelID1].Users[memberID1].Muted {
@@ -47,7 +47,7 @@ func TestVoiceState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%s", block)
+	t.Logf("%+v", block)
 
 	exists = voiceChannels.Join(channel1, member1)
 	if !exists {
@@ -61,7 +61,7 @@ func TestVoiceState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%s", block)
+	t.Logf("%+v", block)
 
 	voiceChannels.Join(channel1, member1)
 	voiceChannels.Leave(memberID1)
@@ -73,5 +73,5 @@ func TestVoiceState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%s", block)
+	t.Logf("%+v", block)
 }
