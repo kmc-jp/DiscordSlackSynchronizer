@@ -55,10 +55,15 @@ func (d DiscordReactionHandler) GetReaction(guildID, channelID, messageID string
 		return errors.Wrap(err, "ParseDiscordTS")
 	}
 
+	// originalMessage is a row message which does not contains dummy uri
+	var originalMessage = srcMessage.Text
+
 	for i, msg := range srcMessages {
 		if strings.Contains(msg.Text, "<"+SlackMessageDummyURI) {
 			var sepMessage = strings.Split(msg.Text, "<"+SlackMessageDummyURI)
 			var messageTS = strings.Split(sepMessage[len(sepMessage)-1], "|")[0]
+
+			originalMessage = strings.Join(sepMessage[:len(sepMessage)-1], "<"+SlackMessageDummyURI)
 
 			srcT, err := time.Parse(time.RFC3339, messageTS)
 			if err != nil {
@@ -88,7 +93,7 @@ func (d DiscordReactionHandler) GetReaction(guildID, channelID, messageID string
 	// add Slack text block if the message has text
 	if strings.TrimSpace(strings.Split(srcMessage.Text, "<"+SlackMessageDummyURI)[0]) != "" {
 		var section = slack_webhook.SectionBlock()
-		section.Text = slack_webhook.MrkdwnElement(srcMessage.Text, false)
+		section.Text = slack_webhook.MrkdwnElement(originalMessage, false)
 
 		blocks = append([]slack_webhook.BlockBase{section}, blocks...)
 	}
