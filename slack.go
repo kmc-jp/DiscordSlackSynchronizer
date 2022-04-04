@@ -190,7 +190,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// ignore bot messages
-	// * to avoid deleting loop
+	// *to avoid getting stuck in an endless loop of deletion and resubmission
 	if ev.SubType == "bot_message" {
 		return
 	}
