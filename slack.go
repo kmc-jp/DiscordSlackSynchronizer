@@ -32,7 +32,9 @@ type SlackHandler struct {
 	messageUnescaper *strings.Replacer
 
 	discordHook *discord_webhook.Handler
-	hook        *slack_webhook.Handler
+
+	hook     *slack_webhook.Handler
+	userHook *slack_webhook.Handler
 
 	apiToken   string
 	eventToken string
@@ -133,6 +135,7 @@ func (s *SlackHandler) SetSlackWebhook(hook *slack_webhook.Handler) {
 
 func (s *SlackHandler) SetUserToken(token string) {
 	s.userToken = token
+	s.userHook = slack_webhook.New(token)
 	s.userAPI = slack.New(token)
 }
 
@@ -167,6 +170,28 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	var cs, discordID = s.settings.FindDiscordChannel(ev.Channel)
 	//Confirm Slack to Discord setting
 	if !cs.Setting.SlackToDiscord {
+		return
+	}
+
+	// ignore own messages
+	if ev.BotID == s.hook.Identity.User {
+		return
+	}
+
+	// delete events not send
+	if ev.SubType == "message_deleted" {
+		// TODO: delete discord messages
+		return
+	}
+
+	// ignore join and leave messages
+	if strings.Contains(ev.SubType, "_join") || strings.Contains(ev.SubType, "_leave") {
+		return
+	}
+
+	// ignore bot messages
+	// * to avoid deleting loop
+	if ev.SubType == "bot_message" {
 		return
 	}
 
@@ -209,12 +234,13 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		return
 	}
 
-	user, err := s.api.GetUserInfo(ev.User)
+	// user, err := s.api.GetUserInfo(ev.User)
+	user, err := s.hook.GetUserProfile(ev.User, false)
 	if err != nil {
 		return
 	}
 
-	var name = user.Profile.DisplayName
+	var name = user.DisplayName
 	if name == "" {
 		name = user.RealName
 	}
@@ -238,7 +264,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 
 	// Send by webhook
 	var message = discord_webhook.Message{
-		AvaterURL: user.Profile.ImageOriginal,
+		AvaterURL: user.ImageOriginal,
 		UserName:  name,
 		GuildID:   discordID,
 		ChannelID: cs.DiscordChannel,
@@ -290,7 +316,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 			}
 
 			var message = slack_webhook.Message{
-				IconURL:     user.Profile.ImageOriginal,
+				IconURL:     user.ImageOriginal,
 				Username:    name,
 				Channel:     ev.Channel,
 				Text:        content,
