@@ -99,6 +99,10 @@ func (s *SlackHandler) Do() {
 			switch evp.Type {
 			case slackevents.CallbackEvent:
 				switch evi := evp.InnerEvent.Data.(type) {
+				// Slackのチャンネルにjoin/leaveしたときのメッセージは流さない (messageHandleにも似たような分岐があります)
+				case *slackevents.MemberJoinedChannelEvent:
+				case *slackevents.MemberLeftChannelEvent:
+					break
 				case *slackevents.AppMentionEvent:
 				case *slackevents.MessageEvent:
 					s.messageHandle(evi)
