@@ -264,7 +264,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 
 	// Send by webhook
 	var message = discord_webhook.Message{
-		AvaterURL: user.ImageOriginal,
+		AvaterURL: user.GetUserImageURI(),
 		UserName:  name,
 		GuildID:   discordID,
 		ChannelID: cs.DiscordChannel,
