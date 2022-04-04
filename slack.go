@@ -164,6 +164,11 @@ func (s *SlackHandler) emojiChangeHandle(ev *slackevents.EmojiChangedEvent) {
 }
 
 func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
+	// Slackのチャンネルにjoin/leaveしたときのメッセージは流さない
+	if ev.Type == slackevents.MemberJoinedChannel || ev.Type == slackevents.MemberLeftChannel {
+		return
+	}
+
 	var cs, discordID = s.settings.FindDiscordChannel(ev.Channel)
 	//Confirm Slack to Discord setting
 	if !cs.Setting.SlackToDiscord {
