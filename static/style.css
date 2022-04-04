@@ -59,3 +59,7 @@
 .inactive {
     color: #adadad
 }
+
+.accordion-setting:after{
+    margin-left: 0;
+}

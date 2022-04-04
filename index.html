@@ -68,10 +68,15 @@
     <template id="template-channel">
         <div class="accordion-item setting">
             <h2 class="accordion-header">
-                <button class="accordion-button accordion-setting collapsed" data-bs-toggle="collapse" data-bs-target="#setting-inner-xxx" aria-expanded="false">
+                <div class="accordion-button accordion-setting collapsed" data-bs-toggle="collapse" data-bs-target="#setting-inner-xxx" aria-expanded="false">
                     <i class="button-icon-setting fas"></i><span class="button-title-setting"></span>
-
-                </button>
+                    <button class="btn-up-setting btn btn-light ms-auto py-0 mx-1 px-2">
+                        <i class="fa-solid fa-arrow-up"></i>
+                    </button>
+                    <button class="btn-down-setting btn btn-light py-0 me-2 px-2">
+                        <i class="fa-solid fa-arrow-down"></i>
+                    </button>
+                </div>
             </h2>
             <div class="setting-inner accordion-collapse collapse">
                 <div class="accordion-body">
