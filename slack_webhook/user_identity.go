@@ -237,3 +237,35 @@ func (s Handler) AuthTest() (*BasicIdentity, error) {
 
 	return response.BasicIdentity, nil
 }
+
+func (u UserProfile) GetUserImageURI() string {
+	if u.ImageOriginal != "" {
+		return u.ImageOriginal
+	}
+
+	if u.Image512 != "" {
+		return u.Image512
+	}
+
+	if u.Image192 != "" {
+		return u.Image192
+	}
+
+	if u.Image72 != "" {
+		return u.Image72
+	}
+
+	if u.Image48 != "" {
+		return u.Image48
+	}
+
+	if u.Image32 != "" {
+		return u.Image32
+	}
+
+	if u.Image24 != "" {
+		return u.Image24
+	}
+
+	return ""
+}
