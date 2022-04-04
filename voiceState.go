@@ -123,7 +123,7 @@ func (v VoiceChannels) SlackBlocksMultiChannel() ([]slack_webhook.BlockBase, err
 		blocks = append(blocks, channelBlocks...)
 	}
 	if len(blocks) <= 1 {
-		element := slack_webhook.MrkdwnElement("誰もいない")
+		element := slack_webhook.MrkdwnElement("誰もいない", false)
 		var block = slack_webhook.ContextBlock(element)
 		blocks = append(blocks, block)
 	}
@@ -135,7 +135,7 @@ func (c VoiceChannel) SlackBlocksSingleChannel() []slack_webhook.BlockBase {
 
 	channelText := fmt.Sprintf("<https://discord.com/channels/%s|%s: >", c.Channel.GuildID, c.Channel.Name)
 
-	var channelNameElement = slack_webhook.MrkdwnElement(channelText)
+	var channelNameElement = slack_webhook.MrkdwnElement(channelText, false)
 
 	blocks = append(
 		blocks,
@@ -181,7 +181,7 @@ func (c VoiceChannel) SlackBlocksSingleChannel() []slack_webhook.BlockBase {
 		}
 
 		text := fmt.Sprintf("%s%s ", emoji, username)
-		var userElm = slack_webhook.MrkdwnElement(text)
+		var userElm = slack_webhook.MrkdwnElement(text, false)
 
 		elements = append(elements, imageElm, userElm)
 

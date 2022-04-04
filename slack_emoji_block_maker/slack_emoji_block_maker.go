@@ -18,7 +18,7 @@ func Build(reacts []*discordgo.MessageReactions) []slack_webhook.BlockBase {
 	for _, react := range reacts {
 		if react.Emoji.ID == "" {
 			var text = react.Emoji.Name
-			var stdEmojiElem = slack_webhook.MrkdwnElement(text)
+			var stdEmojiElem = slack_webhook.MrkdwnElement(text, false)
 
 			elements = append(elements, stdEmojiElem)
 		} else {
@@ -36,7 +36,7 @@ func Build(reacts []*discordgo.MessageReactions) []slack_webhook.BlockBase {
 			elements = append(elements, ctmEmojiElem)
 		}
 
-		var countElem = slack_webhook.MrkdwnElement(strconv.Itoa(react.Count))
+		var countElem = slack_webhook.MrkdwnElement(strconv.Itoa(react.Count), false)
 		elements = append(elements, countElem)
 
 		emojiCount++

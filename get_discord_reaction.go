@@ -87,10 +87,10 @@ func (d DiscordReactionHandler) GetReaction(guildID, channelID, messageID string
 
 	// add Slack text block if the message has text
 	if strings.TrimSpace(strings.Split(srcMessage.Text, "<"+SlackMessageDummyURI)[0]) != "" {
-		var element = slack_webhook.MrkdwnElement(srcMessage.Text)
-		var textBlock = slack_webhook.ContextBlock(element)
+		var section = slack_webhook.SectionBlock()
+		section.Text = slack_webhook.MrkdwnElement(srcMessage.Text, false)
 
-		blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
+		blocks = append([]slack_webhook.BlockBase{section}, blocks...)
 	}
 
 	srcMessage.Blocks = blocks

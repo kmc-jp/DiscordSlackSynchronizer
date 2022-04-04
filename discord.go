@@ -404,14 +404,16 @@ func (d *DiscordHandler) getMessage(s *discordgo.Session, m *discordgo.MessageCr
 
 	// TODO: create channel if not exist option
 
+	// append message content block
+	if m.Content != "" {
+		var section = slack_webhook.SectionBlock()
+		section.Text = slack_webhook.MrkdwnElement(content, false)
+		blocks = append([]slack_webhook.BlockBase{section}, blocks...)
+	}
+
 	// append discord message id
 	if m.Message != nil {
 		content += fmt.Sprintf(" <%s%s|%s>", SlackMessageDummyURI, m.Message.Timestamp, "ㅤ")
-	}
-
-	if len(blocks) > 0 && m.Content != "" {
-		var textBlock = slack_webhook.ContextBlock(slack_webhook.MrkdwnElement(content))
-		blocks = append([]slack_webhook.BlockBase{textBlock}, blocks...)
 	}
 
 	var message = slack_webhook.Message{

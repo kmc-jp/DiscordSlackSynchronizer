@@ -21,6 +21,7 @@ type BlockElement struct {
 	ImageURL string `json:"image_url,omitempty"`
 	AltText  string `json:"alt_text,omitempty"`
 	Text     string `json:"text,omitempty"`
+	Verbatim bool   `json:"verbatim,omitempty"`
 }
 
 type BlockTitle struct {
@@ -45,8 +46,8 @@ func ImageTitle(title string, emoji bool) BlockTitle {
 	}
 }
 
-func MrkdwnElement(text string) BlockElement {
-	return BlockElement{Type: "mrkdwn", Text: text}
+func MrkdwnElement(text string, verbatim bool) BlockElement {
+	return BlockElement{Type: "mrkdwn", Text: text, Verbatim: verbatim}
 }
 
 func ImageElement(imageURL, altText string) BlockElement {
