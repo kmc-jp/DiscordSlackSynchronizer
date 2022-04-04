@@ -99,6 +99,10 @@ func (s *SlackHandler) Do() {
 			switch evp.Type {
 			case slackevents.CallbackEvent:
 				switch evi := evp.InnerEvent.Data.(type) {
+				// Slackのチャンネルにjoin/leaveしたときのメッセージは流さない (messageHandleにも似たような分岐があります)
+				case *slackevents.MemberJoinedChannelEvent:
+				case *slackevents.MemberLeftChannelEvent:
+					break
 				case *slackevents.AppMentionEvent:
 				case *slackevents.MessageEvent:
 					s.messageHandle(evi)
@@ -164,6 +168,11 @@ func (s *SlackHandler) emojiChangeHandle(ev *slackevents.EmojiChangedEvent) {
 }
 
 func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
+	// Slackのチャンネルにjoin/leaveしたときのメッセージは流さない
+	if ev.Type == slackevents.MemberJoinedChannel || ev.Type == slackevents.MemberLeftChannel {
+		return
+	}
+
 	var cs, discordID = s.settings.FindDiscordChannel(ev.Channel)
 	//Confirm Slack to Discord setting
 	if !cs.Setting.SlackToDiscord {
