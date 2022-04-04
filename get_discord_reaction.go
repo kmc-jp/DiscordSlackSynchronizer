@@ -82,11 +82,17 @@ func (d DiscordReactionHandler) GetReaction(guildID, channelID, messageID string
 	}
 
 	var blocks = slack_emoji_block_maker.Build(message.Reactions)
-
+	check = false
 	for _, block := range srcMessage.Blocks {
 		switch block.Type {
 		case "image", "file":
 			blocks = append([]slack_webhook.BlockBase{block}, blocks...)
+		case "section":
+			if check {
+				continue
+			}
+			originalMessage = block.Text.Text
+			check = true
 		}
 	}
 
