@@ -111,7 +111,6 @@ next:
 
 		for i, msg := range messages {
 			if content == msg.Content {
-
 				message = discord_webhook.FromDiscordgoMessage(&messages[i-1])
 				break
 			}
@@ -125,10 +124,7 @@ next:
 
 	var dFiles = []discord_webhook.File{}
 
-	message.Attachments = make([]discord_webhook.Attachment, 0)
-
-	for i := range message.Attachments {
-		var attach = message.Attachments[i]
+	for _, attach := range message.Attachments {
 		if attach.Filename == ReactionGifName {
 			// Reaction Gif should be renewed
 			continue
@@ -149,6 +145,8 @@ next:
 
 		dFiles = append(dFiles, dFile)
 	}
+
+	message.Attachments = []discord_webhook.Attachment{}
 
 	r, err := d.reactionImager.MakeReactionsImage(channel, timestamp)
 	switch err {
