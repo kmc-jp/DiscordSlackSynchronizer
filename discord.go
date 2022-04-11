@@ -453,8 +453,6 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 		return
 	}
 
-	channel, getChannelError := s.State.Channel(vs.VoiceState.ChannelID)
-
 	if voiceChannels.Guilds[vs.GuildID] == nil {
 		voiceChannels.Guilds[vs.GuildID] = &VoiceChannels{}
 	}
@@ -464,8 +462,34 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 	// It must be obtained before the channel settings are overwritten.
 	oldChannel, channelFound := channels.FindChannelHasUser(vs.UserID)
 
+	// Channel detail is needed to include voice channel name to the slack channel message.
+	channel, getChannelError := s.State.Channel(vs.VoiceState.ChannelID)
+	if getChannelError != nil {
+		// remove user from the voice state list
+		channels.Leave(vs.UserID)
+		setting := d.settings.FindSlackChannel(oldChannel, vs.VoiceState.GuildID)
+		if len(channels.Channels[oldChannel].Users) == 0 {
+			d.sendVoiceState(setting, channels, VoiceEmptied)
+		} else {
+			d.sendVoiceState(setting, channels, VoiceLeft)
+		}
+		return
+	}
+
+	// vs.ChannelID is empty when user leaves
+	// If the user changes the channel, the channel ID changes.
+	if channelFound && vs.ChannelID != oldChannel {
+		channels.Leave(vs.UserID)
+		setting := d.settings.FindSlackChannel(oldChannel, vs.VoiceState.GuildID)
+		if len(channels.Channels[oldChannel].Users) == 0 {
+			d.sendVoiceState(setting, channels, VoiceEmptied)
+		} else {
+			d.sendVoiceState(setting, channels, VoiceLeft)
+		}
+	}
+
 	// User joind or State changed
-	if getChannelError == nil && vs.ChannelID != "" {
+	if vs.ChannelID != "" {
 		setting := d.settings.FindSlackChannel(vs.VoiceState.ChannelID, vs.VoiceState.GuildID)
 		mem, err := s.GuildMember(vs.GuildID, vs.UserID)
 		if err != nil {
@@ -484,22 +508,6 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 			d.sendVoiceState(setting, channels, VoiceEntered)
 		} else if setting.Setting.SendMuteState {
 			d.sendVoiceState(setting, channels, VoiceStateChanged)
-		}
-	}
-
-	if !channelFound { // joined
-		return
-	}
-
-	// Channel is empty when user leaves
-	// If the user changes the channel, the channel ID changes.
-	if getChannelError != nil || vs.ChannelID != oldChannel {
-		channels.Leave(vs.UserID)
-		setting := d.settings.FindSlackChannel(oldChannel, vs.VoiceState.GuildID)
-		if len(channels.Channels[oldChannel].Users) == 0 {
-			d.sendVoiceState(setting, channels, VoiceEmptied)
-		} else {
-			d.sendVoiceState(setting, channels, VoiceLeft)
 		}
 	}
 }
