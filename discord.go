@@ -453,7 +453,7 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 		return
 	}
 
-	channel, e := s.State.Channel(vs.VoiceState.ChannelID)
+	channel, getChannelError := s.State.Channel(vs.VoiceState.ChannelID)
 
 	if voiceChannels.Guilds[vs.GuildID] == nil {
 		voiceChannels.Guilds[vs.GuildID] = &VoiceChannels{}
@@ -461,19 +461,11 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 
 	channels := voiceChannels.Guilds[vs.GuildID]
 
-	if e != nil || vs.ChannelID == "" { // If the channel is missing, the user has left
-		channel, ok := channels.FindChannelHasUser(vs.UserID)
-		if !ok {
-			return
-		}
-		channels.Leave(vs.UserID)
-		setting := d.settings.FindSlackChannel(channel, vs.VoiceState.GuildID)
-		if len(channels.Channels[channel].Users) == 0 {
-			d.sendVoiceState(setting, channels, VoiceEmptied)
-		} else {
-			d.sendVoiceState(setting, channels, VoiceLeft)
-		}
-	} else { // User joind or State changed
+	// It must be obtained before the channel settings are overwritten.
+	oldChannel, channelFound := channels.FindChannelHasUser(vs.UserID)
+
+	// User joind or State changed
+	if getChannelError == nil && vs.ChannelID != "" {
 		setting := d.settings.FindSlackChannel(vs.VoiceState.ChannelID, vs.VoiceState.GuildID)
 		mem, err := s.GuildMember(vs.GuildID, vs.UserID)
 		if err != nil {
@@ -492,6 +484,22 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 			d.sendVoiceState(setting, channels, VoiceEntered)
 		} else if setting.Setting.SendMuteState {
 			d.sendVoiceState(setting, channels, VoiceStateChanged)
+		}
+	}
+
+	if !channelFound { // joined
+		return
+	}
+
+	// Channel is empty when user leaves
+	// If the user changes the channel, the channel ID changes.
+	if getChannelError != nil || vs.ChannelID != oldChannel {
+		channels.Leave(vs.UserID)
+		setting := d.settings.FindSlackChannel(oldChannel, vs.VoiceState.GuildID)
+		if len(channels.Channels[oldChannel].Users) == 0 {
+			d.sendVoiceState(setting, channels, VoiceEmptied)
+		} else {
+			d.sendVoiceState(setting, channels, VoiceLeft)
 		}
 	}
 }
