@@ -31,6 +31,29 @@ type File struct {
 	ContentType string
 }
 
+// A Channel holds all data related to an individual Discord channel.
+type Channel struct {
+	ID                   string                           `json:"id"`
+	GuildID              string                           `json:"guild_id"`
+	Name                 string                           `json:"name"`
+	Topic                string                           `json:"topic"`
+	Type                 discordgo.ChannelType            `json:"type"`
+	LastMessageID        string                           `json:"last_message_id"`
+	LastPinTimestamp     discordgo.Timestamp              `json:"last_pin_timestamp"`
+	NSFW                 bool                             `json:"nsfw"`
+	Icon                 string                           `json:"icon"`
+	Position             int                              `json:"position"`
+	Bitrate              int                              `json:"bitrate"`
+	Recipients           []*discordgo.User                `json:"recipients"`
+	Messages             []*Message                       `json:"-"`
+	PermissionOverwrites []*discordgo.PermissionOverwrite `json:"permission_overwrites"`
+	UserLimit            int                              `json:"user_limit"`
+	ParentID             string                           `json:"parent_id"`
+	RateLimitPerUser     int                              `json:"rate_limit_per_user"`
+	OwnerID              string                           `json:"owner_id"`
+	ApplicationID        string                           `json:"application_id"`
+}
+
 type Message struct {
 	Components  []Component  `json:"components,omitempty"`
 	AvaterURL   string       `json:"avatar_url,omitempty"`
@@ -443,4 +466,33 @@ func (h *Handler) GetMessages(channelID string, around string) (messages []disco
 	}
 
 	return responseAttr, nil
+}
+
+func (h *Handler) GetChannel(channelID string) (*Channel, error) {
+	req, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("%s/channels/%s", DiscordAPIEndpoint, channelID),
+		nil,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "NewRequest")
+	}
+
+	req.Header.Set("Authorization", "Bot "+h.token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "DoRequest")
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "ReadAll")
+	}
+
+	var channel Channel
+	err = json.Unmarshal(body, &channel)
+
+	return &channel, errors.Wrap(err, "Unmarshal")
 }
