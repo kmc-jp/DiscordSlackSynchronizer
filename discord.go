@@ -459,12 +459,16 @@ func (d *DiscordHandler) voiceState(s *discordgo.Session, vs *discordgo.VoiceSta
 
 	channels := voiceChannels.Guilds[vs.GuildID]
 
-	// It must be obtained before the channel settings are overwritten.
+	// oldChannel must be obtained before the channel settings are overwritten.
 	oldChannel, channelFound := channels.FindChannelHasUser(vs.UserID)
 
 	// Channel detail is needed to include voice channel name to the slack channel message.
 	channel, getChannelError := s.State.Channel(vs.VoiceState.ChannelID)
 	if getChannelError != nil {
+		if !channelFound {
+			return
+		}
+
 		// remove user from the voice state list
 		channels.Leave(vs.UserID)
 		setting := d.settings.FindSlackChannel(oldChannel, vs.VoiceState.GuildID)
