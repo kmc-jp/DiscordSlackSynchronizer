@@ -59,10 +59,12 @@ func main() {
 	var discordWebhookHandler = discord_webhook.New(Tokens.Discord.API)
 	var slackWebhookHandler = slack_webhook.New(Tokens.Slack.API)
 
-	var slackReactionHandler = NewSlackReactionHandler(slackWebhookHandler, discordWebhookHandler, settings)
+	var messageFinder = NewMessageFinder(slackWebhookHandler, discordWebhookHandler)
+
+	var slackReactionHandler = NewSlackReactionHandler(slackWebhookHandler, discordWebhookHandler, messageFinder, settings)
 	slackReactionHandler.SetReactionImager(imager)
 
-	var discordReacionHandler = NewDiscordReactionHandler(slackWebhookHandler, discordWebhookHandler, settings)
+	var discordReacionHandler = NewDiscordReactionHandler(slackWebhookHandler, discordWebhookHandler, messageFinder, settings)
 
 	var Discord = NewDiscordBot(Tokens.Discord.API, settings)
 	Discord.SetSlackWebhook(slackWebhookHandler)
@@ -76,6 +78,10 @@ func main() {
 	Slack.SetDiscordWebhook(discordWebhookHandler)
 	Slack.SetSlackWebhook(slackWebhookHandler)
 	Slack.SetReactionHandler(slackReactionHandler)
+	Slack.SetFilePublishEmoji(os.Getenv("SLACK_FILE_PUBLISH_EMOJI"))
+	Slack.SetMessageFinder(messageFinder)
+
+	messageFinder.SetMessageEscaper(Slack)
 
 	go func() {
 		// start Discord session

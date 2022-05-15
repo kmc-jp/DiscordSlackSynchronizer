@@ -5,8 +5,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
@@ -21,6 +19,8 @@ type SlackReactionHandler struct {
 	discordHook *discord_webhook.Handler
 	slackHook   *slack_webhook.Handler
 
+	messageFinder *MessageFinder
+
 	settings *SettingsHandler
 
 	escaper MessageEscaper
@@ -33,11 +33,12 @@ type ReactionImagerType interface {
 	GetEmojiURI(name string) string
 }
 
-func NewSlackReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, settings *SettingsHandler) *SlackReactionHandler {
+func NewSlackReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, messageFinder *MessageFinder, settings *SettingsHandler) *SlackReactionHandler {
 	return &SlackReactionHandler{
-		slackHook:   slackHook,
-		discordHook: discordHook,
-		settings:    settings,
+		slackHook:     slackHook,
+		discordHook:   discordHook,
+		messageFinder: messageFinder,
+		settings:      settings,
 	}
 }
 
@@ -64,58 +65,13 @@ func (d *SlackReactionHandler) GetReaction(channel string, timestamp string) err
 	srcContent.Channel = channel
 
 	var oldAttachments []*discordgo.MessageAttachment
-	var message discord_webhook.Message
-	if strings.Contains(srcContent.Text, "<"+SlackMessageDummyURI) {
-		var sepMessage = strings.Split(srcContent.Text, "<"+SlackMessageDummyURI)
-		var messageTS = strings.Split(sepMessage[len(sepMessage)-1], "|")[0]
-
-		messages, err := d.discordHook.GetMessages(cs.DiscordChannel, "")
-		if err != nil {
-			return err
-		}
-
-		srcT, err := time.Parse(time.RFC3339, messageTS)
-		if err != nil {
-			goto next
-		}
-
-		for i, msg := range messages {
-			if i == 0 {
-				continue
-			}
-			t, err := msg.Timestamp.Parse()
-			if err != nil {
-				goto next
-			}
-
-			if t.UnixMilli() < srcT.UnixMilli() {
-				message = discord_webhook.FromDiscordgoMessage(&messages[i-1])
-				oldAttachments = messages[i-1].Attachments
-				break
-			}
-		}
+	dMessage, _, err := d.messageFinder.FindFromSlackMessage(srcContent, cs.DiscordChannel)
+	if err != nil {
+		return errors.Wrap(err, "FindFromSlackMessage")
 	}
 
-next:
-	// if message not found, find by its message text
-	if message.ID == "" {
-		messages, err := d.discordHook.GetMessages(cs.DiscordChannel, "")
-		if err != nil {
-			return err
-		}
-
-		content, err := d.escaper.EscapeMessage(srcContent.Text)
-		if err != nil {
-			return err
-		}
-
-		for i, msg := range messages {
-			if content == msg.Content {
-				message = discord_webhook.FromDiscordgoMessage(&messages[i-1])
-				break
-			}
-		}
-	}
+	oldAttachments = dMessage.Attachments
+	var message = discord_webhook.FromDiscordgoMessage(dMessage)
 
 	// not found
 	if message.ID == "" {

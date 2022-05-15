@@ -33,6 +33,8 @@ type SlackHandler struct {
 
 	discordHook *discord_webhook.Handler
 
+	messageFinder *MessageFinder
+
 	hook     *slack_webhook.Handler
 	userHook *slack_webhook.Handler
 
@@ -44,7 +46,8 @@ type SlackHandler struct {
 
 	settings *SettingsHandler
 
-	reactionHandler ReactionHandler
+	reactionHandler  ReactionHandler
+	filePublishEmoji string
 }
 
 func NewSlackBot(apiToken, eventToken string, settings *SettingsHandler) *SlackHandler {
@@ -66,6 +69,7 @@ func NewSlackBot(apiToken, eventToken string, settings *SettingsHandler) *SlackH
 	slackBot.eventToken = eventToken
 
 	slackBot.settings = settings
+	slackBot.filePublishEmoji = "#"
 
 	res, _ := slackBot.api.AuthTest()
 	slackBot.workspaceURI = res.URL
@@ -108,10 +112,22 @@ func (s *SlackHandler) Do() {
 					s.emojiChangeHandle(evi)
 				case *slackevents.ReactionAddedEvent:
 					if evi.Item.Type == "message" {
+						if evi.Reaction == s.filePublishEmoji {
+							var err = s.FilePublish(evi.Item.Channel, evi.Item.Timestamp, evi.User)
+							if err != nil {
+								log.Println(err)
+							}
+						}
 						s.reactionHandle(evi.Item.Channel, evi.Item.Timestamp)
 					}
 				case *slackevents.ReactionRemovedEvent:
 					if evi.Item.Type == "message" {
+						if evi.Reaction == s.filePublishEmoji {
+							var err = s.FileRevokePublicLink(evi.Item.Channel, evi.Item.Timestamp, evi.User)
+							if err != nil {
+								log.Println(err)
+							}
+						}
 						s.reactionHandle(evi.Item.Channel, evi.Item.Timestamp)
 					}
 				}
@@ -123,6 +139,14 @@ func (s *SlackHandler) Do() {
 
 func (s *SlackHandler) SetReactionHandler(handler ReactionHandler) {
 	s.reactionHandler = handler
+}
+
+func (s *SlackHandler) SetMessageFinder(handler *MessageFinder) {
+	s.messageFinder = handler
+}
+
+func (s *SlackHandler) SetFilePublishEmoji(emoji string) {
+	s.filePublishEmoji = emoji
 }
 
 func (s *SlackHandler) SetDiscordWebhook(hook *discord_webhook.Handler) {
@@ -178,14 +202,14 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		return
 	}
 
-	// delete events not send
-	if ev.SubType == "message_deleted" {
+	// delete events not sends
+	switch ev.SubType {
+	case "", "bot_message", "file_share":
+		break
+	case "message_deleted":
 		// TODO: delete discord messages
 		return
-	}
-
-	// ignore join and leave messages
-	if strings.Contains(ev.SubType, "_join") || strings.Contains(ev.SubType, "_leave") {
+	default:
 		return
 	}
 
@@ -281,7 +305,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	if s.userAPI != nil {
 		_, _, err := s.userAPI.DeleteMessage(ev.Channel, ev.TimeStamp)
 		if err == nil {
-			var content = fmt.Sprintf("%s <%s%s|%s>", ev.Text, SlackMessageDummyURI, newMessage.Timestamp, "ㅤ")
+			var content = ev.Text + " " + s.messageFinder.CreateURIformat(string(newMessage.Timestamp), ev.User, "")
 			var blocks = []slack_webhook.BlockBase{}
 
 			for i, image := range ImageFiles {
@@ -380,4 +404,102 @@ func (s *SlackHandler) EscapeMessage(content string) (output string, err error) 
 	}
 
 	return s.messageUnescaper.Replace(content), nil
+}
+
+func (s *SlackHandler) FilePublish(channel, timestamp, userID string) error {
+	srcContent, err := s.hook.GetMessage(channel, timestamp)
+	if err != nil {
+		return errors.Wrap(err, "SlackGetMessage")
+	}
+
+	var meta = s.messageFinder.ParseMetaData(srcContent.Text)
+	if meta.SlackUserID == "" || userID != meta.SlackUserID {
+		return nil
+	}
+
+	for i, block := range srcContent.Blocks {
+		if block.Type == "file" {
+			if !strings.Contains(block.ExternalID, fmt.Sprintf("%s:", ProgramName)) {
+				continue
+			}
+
+			var fileID = strings.Split(block.ExternalID, fmt.Sprintf("%s:", ProgramName))[1]
+
+			file, _, _, err := s.userAPI.ShareFilePublicURL(fileID)
+			if err != nil {
+				log.Println("FilePublish: ShareFilePublicURL: ", err)
+				continue
+			}
+
+			err = s.hook.FilesRemoteRemove(block.ExternalID, "")
+			if err != nil {
+				log.Println("FilePublish: FilesRemoteRemove: ", err)
+				continue
+			}
+
+			s.hook.FilesRemoteAdd(
+				slack_webhook.FilesRemoteAddParameters{
+					Title:       file.Name,
+					ExternalURL: file.PermalinkPublic,
+					ExternalID:  block.ExternalID,
+					FileType:    file.Filetype,
+				},
+			)
+
+			srcContent.Blocks[i] = slack_webhook.FileBlock(block.ExternalID)
+		}
+	}
+
+	s.hook.Update(*srcContent)
+
+	return nil
+}
+
+func (s *SlackHandler) FileRevokePublicLink(channel, timestamp, userID string) error {
+	srcContent, err := s.hook.GetMessage(channel, timestamp)
+	if err != nil {
+		return errors.Wrap(err, "SlackGetMessage")
+	}
+
+	var meta = s.messageFinder.ParseMetaData(srcContent.Text)
+	if meta.SlackUserID == "" || userID != meta.SlackUserID {
+		return nil
+	}
+
+	for i, block := range srcContent.Blocks {
+		if block.Type == "file" {
+			if !strings.Contains(block.ExternalID, fmt.Sprintf("%s:", ProgramName)) {
+				continue
+			}
+
+			var fileID = strings.Split(block.ExternalID, fmt.Sprintf("%s:", ProgramName))[1]
+
+			file, err := s.userAPI.RevokeFilePublicURL(fileID)
+			if err != nil {
+				log.Println("FileRevokePublicLink: RevokeFilePublicURL: ", err)
+				continue
+			}
+
+			err = s.hook.FilesRemoteRemove(block.ExternalID, "")
+			if err != nil {
+				log.Println("FileRevokePublicLink: FilesRemoteRemove: ", err)
+				continue
+			}
+
+			s.hook.FilesRemoteAdd(
+				slack_webhook.FilesRemoteAddParameters{
+					Title:       file.Name,
+					ExternalURL: file.Permalink,
+					ExternalID:  block.ExternalID,
+					FileType:    file.Filetype,
+				},
+			)
+
+			srcContent.Blocks[i] = slack_webhook.FileBlock(block.ExternalID)
+		}
+	}
+
+	s.hook.Update(*srcContent)
+
+	return nil
 }

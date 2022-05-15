@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_block_maker"
@@ -15,14 +13,17 @@ type DiscordReactionHandler struct {
 	discordHook *discord_webhook.Handler
 	slackHook   *slack_webhook.Handler
 
+	messageFinder *MessageFinder
+
 	settings *SettingsHandler
 }
 
-func NewDiscordReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, settings *SettingsHandler) *DiscordReactionHandler {
+func NewDiscordReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, messageFinder *MessageFinder, settings *SettingsHandler) *DiscordReactionHandler {
 	return &DiscordReactionHandler{
-		slackHook:   slackHook,
-		discordHook: discordHook,
-		settings:    settings,
+		slackHook:     slackHook,
+		discordHook:   discordHook,
+		messageFinder: messageFinder,
+		settings:      settings,
 	}
 }
 
@@ -42,47 +43,15 @@ func (d DiscordReactionHandler) GetReaction(guildID, channelID, messageID string
 		return errors.Wrap(err, "GetDiscordMessage")
 	}
 
-	srcMessages, err := d.slackHook.GetMessages(sdt.SlackChannel, "", 100)
+	srcMessage, meta, err := d.messageFinder.FindFromDiscordMessage(message, sdt.SlackChannel)
 	if err != nil {
-		return errors.Wrap(err, "GetSlackMessages")
+		return errors.Wrap(err, "FindFromDiscordMessage")
 	}
 
-	var srcMessage slack_webhook.Message
-	var check bool
-
-	dTime, err := message.Timestamp.Parse()
-	if err != nil {
-		return errors.Wrap(err, "ParseDiscordTS")
-	}
-
-	// originalMessage is a row message which does not contains dummy uri
-	var originalMessage = srcMessage.Text
-
-	for i, msg := range srcMessages {
-		if strings.Contains(msg.Text, "<"+SlackMessageDummyURI) {
-			var sepMessage = strings.Split(msg.Text, "<"+SlackMessageDummyURI)
-			var messageTS = strings.Split(sepMessage[len(sepMessage)-1], "|")[0]
-
-			originalMessage = strings.Join(sepMessage[:len(sepMessage)-1], "<"+SlackMessageDummyURI)
-
-			srcT, err := time.Parse(time.RFC3339, messageTS)
-			if err != nil {
-				continue
-			}
-
-			if dTime.UnixMilli() >= srcT.UnixMilli() {
-				srcMessage = srcMessages[i]
-				check = true
-				break
-			}
-		}
-	}
-	if !check {
-		return fmt.Errorf("MessageNotFound")
-	}
+	var originalMessage = meta.OriginalMessage
 
 	var blocks = slack_emoji_block_maker.Build(message.Reactions)
-	check = false
+	var check = false
 	for _, block := range srcMessage.Blocks {
 		switch block.Type {
 		case "image", "file":
@@ -107,7 +76,7 @@ func (d DiscordReactionHandler) GetReaction(guildID, channelID, messageID string
 	srcMessage.Blocks = blocks
 	srcMessage.Channel = sdt.SlackChannel
 
-	_, err = d.slackHook.Update(srcMessage)
+	_, err = d.slackHook.Update(*srcMessage)
 	if err != nil {
 		return errors.Wrap(err, "UpdateMessage")
 	}

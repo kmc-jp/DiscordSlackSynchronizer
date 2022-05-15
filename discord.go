@@ -15,6 +15,7 @@ import (
 )
 
 const DiscordAPIEndpoint = "https://discord.com/api"
+
 const SlackMessageDummyURI = "http://example?discord_message_ts="
 
 type DiscordHandler struct {
@@ -413,7 +414,7 @@ func (d *DiscordHandler) getMessage(s *discordgo.Session, m *discordgo.MessageCr
 
 	// append discord message id
 	if m.Message != nil {
-		content += fmt.Sprintf(" <%s%s|%s>", SlackMessageDummyURI, m.Message.Timestamp, "ㅤ")
+		content += fmt.Sprintf(" <%s%s&slack_user_id=&discord_user_id=%s|%s>", SlackMessageDummyURI, m.Message.Timestamp, m.Author.ID, "ㅤ")
 	}
 
 	var message = slack_webhook.Message{
