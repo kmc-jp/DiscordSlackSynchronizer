@@ -204,7 +204,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// ignore specified messages
-	if !cs.Setting.MuteSlackUsers.Find(ev.User) {
+	if cs.Setting.MuteSlackUsers.Find(ev.User) {
 		return
 	}
 
