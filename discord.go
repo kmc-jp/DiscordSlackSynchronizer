@@ -10,6 +10,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	dp "github.com/kmc-jp/DiscordSlackSynchronizer/discord_plugin"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/settings"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
 )
@@ -36,13 +37,13 @@ type DiscordHandler struct {
 
 	reactionHandler *DiscordReactionHandler
 
-	settings *SettingsHandler
+	settings *settings.Handler
 	options  struct {
 		enableModify bool
 	}
 }
 
-func NewDiscordBot(apiToken string, settings *SettingsHandler) *DiscordHandler {
+func NewDiscordBot(apiToken string, settings *settings.Handler) *DiscordHandler {
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + Tokens.Discord.API)
 	if err != nil {
@@ -536,7 +537,7 @@ func (d *DiscordHandler) ReactionRemoveAll(_ *discordgo.Session, ev *discordgo.M
 	}
 }
 
-func (d *DiscordHandler) sendVoiceState(setting ChannelSetting, channels *VoiceChannels, event VoiceEvent) {
+func (d *DiscordHandler) sendVoiceState(setting settings.ChannelSetting, channels *VoiceChannels, event VoiceEvent) {
 	if setting.SlackChannel == "" {
 		return
 	}

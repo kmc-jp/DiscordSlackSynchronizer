@@ -1,60 +1,32 @@
 package configurator
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/kmc-jp/DiscordSlackSynchronizer/settings"
 )
 
 type SettingsHandler struct {
-	confPath string
-
 	Discord *DiscordHandler
 	Slack   *SlackHandler
 
 	controller chan int
 
-	Settings []SlackDiscordTable
+	settings *settings.Handler
 
 	socketType     string
 	socketFileAddr string
 }
 
-//SlackDiscordTable dict of Channel
-type SlackDiscordTable struct {
-	Discord       string           `json:"discord_server"`
-	Channel       []ChannelSetting `json:"channel"`
-	SlackSuffix   string           `json:"slack_suffix"`
-	DiscordSuffix string           `json:"discord_suffix"`
-}
-
-//ChannelSetting Put send settings
-type ChannelSetting struct {
-	Comment        string      `json:"comment"`
-	SlackChannel   string      `json:"slack"`
-	DiscordChannel string      `json:"discord"`
-	Setting        SendSetting `json:"setting"`
-	Webhook        string      `json:"hook"`
-}
-
-//SendSetting put send setting
-type SendSetting struct {
-	SlackToDiscord           bool `json:"slack2discord"`
-	DiscordToSlack           bool `json:"discord2slack"`
-	ShowChannelName          bool `json:"ShowChannelName"`
-	SendVoiceState           bool `json:"SendVoiceState"`
-	SendMuteState            bool `json:"SendMuteState"`
-	CreateSlackChannelOnSend bool `json:"CreateSlackChannelOnSend"`
-}
-
-func NewSettingsHandler(confPath string, discord *DiscordHandler, slackHandler *SlackHandler) *SettingsHandler {
+func NewSettingsHandler(settings *settings.Handler, discord *DiscordHandler, slackHandler *SlackHandler) *SettingsHandler {
 	return &SettingsHandler{
-		confPath: confPath,
 		Discord:  discord,
 		Slack:    slackHandler,
+		settings: settings,
 	}
 }
 
@@ -87,8 +59,7 @@ func (s *SettingsHandler) Start(prefix, sock, addr string) (chan int, error) {
 	mux.Handle(prefix+"/static/", http.StripPrefix(prefix+"/static/", http.FileServer(http.Dir("static"))))
 
 	go func() {
-		var err error
-		err = http.Serve(l, mux)
+		err := http.Serve(l, mux)
 		log.Printf("Error: Start http server: %s\n", err.Error())
 	}()
 
@@ -101,7 +72,6 @@ func (s *SettingsHandler) Close() (err error) {
 	if s.socketType == "unix" {
 		err = os.Remove(s.socketFileAddr)
 	}
-
 	return
 }
 
@@ -123,23 +93,4 @@ func (s *SettingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Bad Request"))
 		w.WriteHeader(500)
 	}
-	return
-}
-
-func (s *SettingsHandler) ReadSettings() error {
-	b, err := ioutil.ReadFile(s.confPath)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(b, &s.Settings)
-	return err
-}
-
-func (s *SettingsHandler) WriteSettings() error {
-	b, err := json.MarshalIndent(s.Settings, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(s.confPath, b, 0644)
 }

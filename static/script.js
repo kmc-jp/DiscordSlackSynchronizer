@@ -21,7 +21,14 @@ class ChannelSettings {
                 discord2slack: Boolean(channel_setting.setting.discord2slack),
                 ShowChannelName: Boolean(channel_setting.setting.ShowChannelName),
                 SendMuteState: Boolean(channel_setting.setting.SendMuteState),
-                SendVoiceState: Boolean(channel_setting.setting.SendVoiceState)
+                SendVoiceState: Boolean(channel_setting.setting.SendVoiceState),
+                MuteSlackUsers: []
+            }
+
+            if (channel_setting.setting.MuteSlackUsers) {
+                for (let user of channel_setting.setting.MuteSlackUsers) {
+                    this.setting.MuteSlackUsers.push(new UserSettings(user))
+                }
             }
         } else {
             this.setting = {}
@@ -37,7 +44,6 @@ class ChannelSettings {
     set SendVoiceState(ok) { this.setting.SendVoiceState = Boolean(ok) }
     set SendMuteState(ok) { this.setting.SendMuteState = Boolean(ok) }
 
-
     get Comment() { return this.comment }
     get SlackChannel() { return this.slack }
     get DiscordChannel() { return this.discord }
@@ -46,7 +52,19 @@ class ChannelSettings {
     get ShowChannelName() { return this.setting.ShowChannelName }
     get SendVoiceState() { return this.setting.SendVoiceState }
     get SendMuteState() { return this.setting.SendMuteState }
+}
 
+class UserSettings {
+    constructor(user_setting) {
+        this.id = user_setting.ID;
+        this.nick_name = user_setting.NickName;
+    }
+
+    set NickName(nick_name) { String(this.nick_name = Nick) }
+    set ID(id) { String(this.id = id) }
+
+    get NickName() { return this.nick_name }
+    get ID() { return this.id }
 }
 
 window.onload = async() => {
@@ -249,9 +267,9 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
     const add_setting = document.querySelector("#add");
     add_setting.onclick = event => {
         settings.channel.push(new ChannelSettings({ "Setting": {} }))
-            make_settings_list(guild_id, discord_channel_list, slack_channel_list);
+        make_settings_list(guild_id, discord_channel_list, slack_channel_list);
     };
-        
+
     const accordion_div = document.querySelector("#channels");
     accordion_div.innerHTML = "";
 
@@ -265,7 +283,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         const setting_id = `setting-${settings_index}`;
         setting_channel.querySelector(".setting").id = setting_id;
 
-        const inner_id =`setting-inner-${settings_index}`
+        const inner_id = `setting-inner-${settings_index}`
         setting_channel.querySelector(".setting-inner").id = inner_id;
 
 
@@ -273,14 +291,14 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         const accordion = setting_channel.querySelector(".accordion-setting");
         accordion.setAttribute("data-bs-target", `#${inner_id}`)
         accordion.setAttribute("aria-controls", inner_id);
-        
+
         const span = setting_channel.querySelector(".button-title-setting");
         const icon = setting_channel.querySelector(".button-icon-setting");
-        
+
         let discord_channel = discord_channel_list.find(chan => { return chan.id == setting.DiscordChannel });
         if (discord_channel !== undefined) {
             switch (discord_channel.type) {
-                case 0:                        
+                case 0:
                     icon.classList.add("fa-hashtag");
                     span.innerText = discord_channel.name;
                     break;
@@ -298,13 +316,13 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
             icon.classList.add("fa-hashtag");
             span.innerText = "New Setting";
         }
-        
+
         const this_setting = setting;
 
         // 順序入れ替え
         const button_up = setting_channel.querySelector(".btn-up-setting");
         if (index < 1) {
-             button_up.disabled = true;
+            button_up.disabled = true;
         }
         button_up.onclick = () => {
             if (index < 1) return false;
@@ -322,7 +340,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
             make_settings_list(guild_id, discord_channel_list, slack_channel_list);
             return false;
         }
-        
+
         // Discordのチャンネルの選択項目
         const select_discord = setting_channel.querySelector(".discord-channel-setting");
         const isTextChannel = !(discord_channel && discord_channel.type !== 0);
@@ -330,18 +348,18 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
             for (let option of select_discord.querySelectorAll("[data-discordid]")) {
                 select_discord.removeChild(option);
             }
-            
+
             let option = select_discord.querySelector("option")
             if (!this_setting.DiscordChannel) {
                 option.selected = true;
             }
-    
+
             for (channel of discord_channel_list) {
                 const option = document.createElement("option")
                 if (this_setting.DiscordChannel == channel.id) {
                     option.selected = true;
                 }
-    
+
                 if ((isTextChannel && channel.type === 0) || (!isTextChannel && channel.type === 2)) {
                     option.innerText = channel.name;
                     option.setAttribute("data-discordid", channel.id)
@@ -365,7 +383,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
 
 
         // slackのチャンネルの選択項目生成
-        const select_slack = setting_channel.querySelector(".slack-channel-setting");        
+        const select_slack = setting_channel.querySelector(".slack-channel-setting");
         option = select_slack.querySelector("option")
         if (!setting.SlackChannel) {
             option.selected = true;
@@ -381,7 +399,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
             option.setAttribute("data-slackid", channel.id)
             select_slack.appendChild(option)
         }
-        
+
         select_slack.onchange = (event) => {
             if (!event.target.value) {
                 setting.SlackChannel = "";
@@ -390,7 +408,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
             this_setting.SlackChannel = event.target.options[event.target.selectedIndex].getAttribute("data-slackid");
         };
 
-        
+
         // チェック項目の作成
         // VoiceState
         const voice_state_input = setting_channel.querySelector(".send-voice-state-setting");
@@ -401,9 +419,9 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
         voice_state_input.onchange = (event) => {
             this_setting.SendVoiceState = event.target.checked == true
             this_setting.DiscordChannel = "";
-        
+
             icon.classList.remove("fa-volume-up", "fa-hashtag");
-            const select_discord = document.querySelector(`#${setting_id} .discord-channel-setting`) 
+            const select_discord = document.querySelector(`#${setting_id} .discord-channel-setting`)
             if (!setting.SendVoiceState) {
                 regenerate_select_discord(select_discord, true);
                 icon.classList.add("fa-hashtag");
@@ -422,7 +440,7 @@ const make_settings_list = async(guild_id, discord_channel_list, slack_channel_l
                 }
             }
         }
-        
+
         // MuteState
         const mute_state_input = setting_channel.querySelector(`.send-mute-state-setting`);
         mute_state_input.disabled = setting.SendVoiceState == false

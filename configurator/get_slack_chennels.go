@@ -21,6 +21,4 @@ func (s *SettingsHandler) GetSlackChannels(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Add("Content-type", "application/json")
-
-	return
 }

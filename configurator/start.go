@@ -1,5 +1,7 @@
 package configurator
 
+import "github.com/kmc-jp/DiscordSlackSynchronizer/settings"
+
 const (
 	CommandRestart = 1 + iota
 )
@@ -11,21 +13,19 @@ type Handler struct {
 	slack struct {
 		API string
 	}
-	confPath string
 
 	settings *SettingsHandler
 }
 
-func New(discord, slack, confPath string) *Handler {
+func New(discord, slack string) *Handler {
 	var handler Handler
 	handler.discord.API = discord
 	handler.slack.API = slack
-	handler.confPath = confPath
 
 	return &handler
 }
 
-func (h Handler) Start(prefix, sock, addr string) (chan int, error) {
+func (h Handler) Start(prefix, sock, addr string, setting *settings.Handler) (chan int, error) {
 	Discord, err := NewDiscordHandler(h.discord.API)
 	if err != nil {
 		return nil, err
@@ -33,15 +33,13 @@ func (h Handler) Start(prefix, sock, addr string) (chan int, error) {
 
 	Slack := NewSlackHandler(h.slack.API)
 
-	s := NewSettingsHandler(
-		h.confPath,
+	h.settings = NewSettingsHandler(
+		setting,
 		Discord,
 		Slack,
 	)
 
-	h.settings = s
-
-	return s.Start(prefix, sock, addr)
+	return h.settings.Start(prefix, sock, addr)
 }
 
 func (h Handler) Close() error {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/settings"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
@@ -21,7 +22,7 @@ type SlackReactionHandler struct {
 
 	messageFinder *MessageFinder
 
-	settings *SettingsHandler
+	settings *settings.Handler
 
 	escaper MessageEscaper
 }
@@ -33,7 +34,7 @@ type ReactionImagerType interface {
 	GetEmojiURI(name string) string
 }
 
-func NewSlackReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, messageFinder *MessageFinder, settings *SettingsHandler) *SlackReactionHandler {
+func NewSlackReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, messageFinder *MessageFinder, settings *settings.Handler) *SlackReactionHandler {
 	return &SlackReactionHandler{
 		slackHook:     slackHook,
 		discordHook:   discordHook,

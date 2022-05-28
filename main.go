@@ -9,6 +9,7 @@ import (
 
 	"github.com/kmc-jp/DiscordSlackSynchronizer/configurator"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/settings"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_imager"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 )
@@ -44,7 +45,7 @@ func init() {
 }
 
 func main() {
-	var settings = NewSettingsHandler(Tokens.Slack.API, Tokens.Discord.API)
+	var setting = settings.New(Tokens.Slack.API, Tokens.Discord.API, SettingsFile)
 
 	imager, err := slack_emoji_imager.New(Tokens.Slack.User, Tokens.Slack.API)
 	if err != nil {
@@ -61,18 +62,18 @@ func main() {
 
 	var messageFinder = NewMessageFinder(slackWebhookHandler, discordWebhookHandler)
 
-	var slackReactionHandler = NewSlackReactionHandler(slackWebhookHandler, discordWebhookHandler, messageFinder, settings)
+	var slackReactionHandler = NewSlackReactionHandler(slackWebhookHandler, discordWebhookHandler, messageFinder, setting)
 	slackReactionHandler.SetReactionImager(imager)
 
-	var discordReacionHandler = NewDiscordReactionHandler(slackWebhookHandler, discordWebhookHandler, messageFinder, settings)
+	var discordReacionHandler = NewDiscordReactionHandler(slackWebhookHandler, discordWebhookHandler, messageFinder, setting)
 
-	var Discord = NewDiscordBot(Tokens.Discord.API, settings)
+	var Discord = NewDiscordBot(Tokens.Discord.API, setting)
 	Discord.SetSlackWebhook(slackWebhookHandler)
 	Discord.SetDiscordWebhook(discordWebhookHandler)
 	Discord.SetDiscordReactionHandler(discordReacionHandler)
 	Discord.EnableModify(os.Getenv("DISCORD_ENABLE_MODIFY_MESSAGES") == "yes")
 
-	var Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event, settings)
+	var Slack = NewSlackBot(Tokens.Slack.API, Tokens.Slack.Event, setting)
 
 	Slack.SetUserToken(Tokens.Slack.User)
 	Slack.SetDiscordWebhook(discordWebhookHandler)
@@ -101,10 +102,10 @@ func main() {
 	var listenAddr = os.Getenv("LISTEN_ADDRESS")
 
 	// start web configurator
-	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API, SettingsFile)
+	var conf = configurator.New(Tokens.Discord.API, Tokens.Slack.API)
 	switch sockType {
 	case "tcp", "unix":
-		controller, err := conf.Start(os.Getenv("HTTP_PATH_PREFIX"), sockType, listenAddr)
+		controller, err := conf.Start(os.Getenv("HTTP_PATH_PREFIX"), sockType, listenAddr, setting)
 		if err != nil {
 			panic(err)
 		}

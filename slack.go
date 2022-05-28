@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/settings"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
 	"github.com/slack-go/slack"
@@ -44,13 +45,13 @@ type SlackHandler struct {
 
 	workspaceURI string
 
-	settings *SettingsHandler
+	settings *settings.Handler
 
 	reactionHandler  ReactionHandler
 	filePublishEmoji string
 }
 
-func NewSlackBot(apiToken, eventToken string, settings *SettingsHandler) *SlackHandler {
+func NewSlackBot(apiToken, eventToken string, settings *settings.Handler) *SlackHandler {
 	var slackBot SlackHandler
 
 	slackBot.api = slack.New(
@@ -203,7 +204,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// ignore specified messages
-	if !cs.Setting.MuteSlackUserIDs.Find(ev.User){
+	if !cs.Setting.MuteSlackUsers.Find(ev.User) {
 		return
 	}
 

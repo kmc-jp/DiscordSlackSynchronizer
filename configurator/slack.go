@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 type SlackChannel struct {
@@ -74,13 +76,16 @@ func (s *SlackHandler) GetChannels() ([]SlackChannel, error) {
 		var client = new(http.Client)
 		req, err := http.NewRequest("POST", SlackAPIEndpoint+"conversations.list", bytes.NewBufferString(body.Encode()))
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "NewRequest")
 		}
 
 		req.Header.Set("Content-type", "application/x-www-form-urlencoded")
 		req.Header.Add("Authorization", "Bearer "+s.token)
 
 		resp, err := client.Do(req)
+		if err != nil {
+			return nil, errors.Wrap(err, "Do")
+		}
 
 		var apiRes response
 		err = json.NewDecoder(resp.Body).Decode(&apiRes)

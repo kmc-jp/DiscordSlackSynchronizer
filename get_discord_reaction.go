@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
+	"github.com/kmc-jp/DiscordSlackSynchronizer/settings"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_emoji_block_maker"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/slack_webhook"
 	"github.com/pkg/errors"
@@ -15,10 +16,10 @@ type DiscordReactionHandler struct {
 
 	messageFinder *MessageFinder
 
-	settings *SettingsHandler
+	settings *settings.Handler
 }
 
-func NewDiscordReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, messageFinder *MessageFinder, settings *SettingsHandler) *DiscordReactionHandler {
+func NewDiscordReactionHandler(slackHook *slack_webhook.Handler, discordHook *discord_webhook.Handler, messageFinder *MessageFinder, settings *settings.Handler) *DiscordReactionHandler {
 	return &DiscordReactionHandler{
 		slackHook:     slackHook,
 		discordHook:   discordHook,
