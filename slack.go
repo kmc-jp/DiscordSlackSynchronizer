@@ -211,7 +211,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 
 	// delete events not sends
 	switch ev.SubType {
-	case "", "bot_message", "file_share":
+	case "", "file_share":
 		break
 	case "message_deleted":
 		// TODO: delete discord messages
