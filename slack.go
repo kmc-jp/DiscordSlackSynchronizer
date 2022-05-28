@@ -220,12 +220,6 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		return
 	}
 
-	// ignore bot messages
-	// *to avoid getting stuck in an endless loop of deletion and resubmission
-	if ev.SubType == "bot_message" {
-		return
-	}
-
 	type imageFileType struct {
 		info   slackevents.File
 		reader io.Reader
