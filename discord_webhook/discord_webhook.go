@@ -12,6 +12,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pkg/errors"
@@ -39,7 +40,7 @@ type Channel struct {
 	Topic                string                           `json:"topic"`
 	Type                 discordgo.ChannelType            `json:"type"`
 	LastMessageID        string                           `json:"last_message_id"`
-	LastPinTimestamp     discordgo.Timestamp              `json:"last_pin_timestamp"`
+	LastPinTimestamp     time.Time                        `json:"last_pin_timestamp"`
 	NSFW                 bool                             `json:"nsfw"`
 	Icon                 string                           `json:"icon"`
 	Position             int                              `json:"position"`
@@ -64,8 +65,8 @@ type Message struct {
 	ChannelID        string                        `json:"channel_id"`
 	GuildID          string                        `json:"guild_id,omitempty"`
 	Content          string                        `json:"content"`
-	Timestamp        discordgo.Timestamp           `json:"timestamp"`
-	EditedTimestamp  discordgo.Timestamp           `json:"edited_timestamp"`
+	Timestamp        time.Time                     `json:"timestamp"`
+	EditedTimestamp  *time.Time                    `json:"edited_timestamp"`
 	MentionRoles     []string                      `json:"mention_roles"`
 	TTS              bool                          `json:"tts"`
 	MentionEveryone  bool                          `json:"mention_everyone"`

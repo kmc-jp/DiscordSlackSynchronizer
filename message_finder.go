@@ -86,12 +86,8 @@ func (h MessageFinder) FindFromSlackMessage(srcContent *slack_webhook.Message, d
 			if i == 0 {
 				continue
 			}
-			t, err := msg.Timestamp.Parse()
-			if err != nil {
-				goto next
-			}
 
-			if t.UnixMilli() < srcT.UnixMilli() {
+			if msg.Timestamp.UnixMilli() < srcT.UnixMilli() {
 				message = messages[i-1]
 				break
 			}
@@ -136,10 +132,7 @@ func (h MessageFinder) FindFromDiscordMessage(message discordgo.Message, slackCh
 	var srcMessage slack_webhook.Message
 	var check bool
 
-	dTime, err := message.Timestamp.Parse()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "ParseDiscordTS")
-	}
+	dTime := message.Timestamp
 
 	var meta *MetaData
 

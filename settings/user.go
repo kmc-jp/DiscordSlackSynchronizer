@@ -8,6 +8,9 @@ type User struct {
 type Users []User
 
 func (u Users) Find(id string) bool {
+	if id == "" {
+		return false
+	}
 	for _, uid := range u {
 		if uid.ID == id {
 			return true

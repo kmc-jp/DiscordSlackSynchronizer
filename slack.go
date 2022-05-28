@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/kmc-jp/DiscordSlackSynchronizer/discord_webhook"
 	"github.com/kmc-jp/DiscordSlackSynchronizer/settings"
@@ -192,6 +193,8 @@ func (s *SlackHandler) emojiChangeHandle(ev *slackevents.EmojiChangedEvent) {
 }
 
 func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
+	fmt.Printf("Message: %+v\nUser: %s\n", ev.Text, ev.User)
+
 	var cs, discordID = s.settings.FindDiscordChannel(ev.Channel)
 	//Confirm Slack to Discord setting
 	if !cs.Setting.SlackToDiscord {
@@ -199,7 +202,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// ignore own messages
-	if ev.BotID == s.hook.Identity.User {
+	if ev.BotID == s.hook.Identity.UserID {
 		return
 	}
 
@@ -216,12 +219,6 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		// TODO: delete discord messages
 		return
 	default:
-		return
-	}
-
-	// ignore bot messages
-	// *to avoid getting stuck in an endless loop of deletion and resubmission
-	if ev.SubType == "bot_message" {
 		return
 	}
 
@@ -311,7 +308,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	if s.userAPI != nil {
 		_, _, err := s.userAPI.DeleteMessage(ev.Channel, ev.TimeStamp)
 		if err == nil {
-			var content = ev.Text + " " + s.messageFinder.CreateURIformat(string(newMessage.Timestamp), ev.User, "")
+			var content = ev.Text + " " + s.messageFinder.CreateURIformat(newMessage.Timestamp.Format(time.RFC3339), ev.User, "")
 			var blocks = []slack_webhook.BlockBase{}
 
 			for i, image := range ImageFiles {
