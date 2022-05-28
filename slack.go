@@ -202,6 +202,13 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		return
 	}
 
+	// ignore specified messages
+	for _, uid := range cs.Setting.MuteSlackUserID{
+		if uid == ev.User{
+			return
+		}	
+	}
+
 	// delete events not sends
 	switch ev.SubType {
 	case "", "bot_message", "file_share":

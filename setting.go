@@ -28,12 +28,13 @@ type ChannelSetting struct {
 
 //SendSetting put send setting
 type SendSetting struct {
-	SlackToDiscord           bool `json:"slack2discord"`
-	DiscordToSlack           bool `json:"discord2slack"`
-	ShowChannelName          bool `json:"ShowChannelName"`
-	SendVoiceState           bool `json:"SendVoiceState"`
-	SendMuteState            bool `json:"SendMuteState"`
-	CreateSlackChannelOnSend bool `json:"CreateSlackChannelOnSend"`
+	SlackToDiscord           bool 	`json:"slack2discord"`
+	DiscordToSlack           bool 	`json:"discord2slack"`
+	ShowChannelName          bool 	`json:"ShowChannelName"`
+	SendVoiceState           bool 	`json:"SendVoiceState"`
+	SendMuteState            bool 	`json:"SendMuteState"`
+	CreateSlackChannelOnSend bool   `json:"CreateSlackChannelOnSend"`
+	MuteSlackUserID				 []string `json:"MuteSlackUserID"`
 }
 
 func NewSettingsHandler(slackToken, discordToken string) *SettingsHandler {
