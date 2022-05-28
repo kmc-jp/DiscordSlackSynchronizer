@@ -203,10 +203,8 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// ignore specified messages
-	for _, uid := range cs.Setting.MuteSlackUserID{
-		if uid == ev.User{
-			return
-		}	
+	if !cs.Setting.MuteSlackUserIDs.Find(ev.User){
+		return
 	}
 
 	// delete events not sends
@@ -217,6 +215,12 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 		// TODO: delete discord messages
 		return
 	default:
+		return
+	}
+
+	// ignore bot messages
+	// *to avoid getting stuck in an endless loop of deletion and resubmission
+	if ev.SubType == "bot_message" {
 		return
 	}
 
