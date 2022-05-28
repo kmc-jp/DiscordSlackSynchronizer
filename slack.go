@@ -193,8 +193,6 @@ func (s *SlackHandler) emojiChangeHandle(ev *slackevents.EmojiChangedEvent) {
 }
 
 func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
-	fmt.Printf("Message: %+v\nUser: %s\n", ev.Text, ev.User)
-
 	var cs, discordID = s.settings.FindDiscordChannel(ev.Channel)
 	//Confirm Slack to Discord setting
 	if !cs.Setting.SlackToDiscord {
@@ -202,7 +200,7 @@ func (s *SlackHandler) messageHandle(ev *slackevents.MessageEvent) {
 	}
 
 	// ignore own messages
-	if ev.BotID == s.hook.Identity.UserID {
+	if ev.User == s.hook.Identity.UserID {
 		return
 	}
 
