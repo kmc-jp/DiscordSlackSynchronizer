@@ -1,0 +1,64 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - 
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+archives:
+  - 
+    replacements:
+      linux: Linux
+      darwin: macOS
+      windows: Windows
+      386: i386
+      amd64: x86_64
+    name_template: "Server_{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files: 
+      - index.html
+      - static/**/*
+      - NotoColorEmoji
+  - 
+    id: "ClientArchive"
+    builds:
+      - Client
+    replacements:
+      linux: Linux
+      darwin: macOS
+      windows: Windows
+      386: i386
+      amd64: x86_64
+    name_template: "Client_{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+release:
+  draft: false
+
+  prerelease: auto
+
+  mode: append
+
+  header: |
+    ## Update ({{ .Date }})
+  footer: |
+    Those were the changes on {{ .Tag }}!
+  name_template: "{{.ProjectName}}-v{{.Version}}"
+  

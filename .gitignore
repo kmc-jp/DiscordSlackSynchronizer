@@ -1,0 +1,12 @@
+*.json
+
+*.exe
+.vscode
+
+dist/
+DiscordSlackSynchronizer*
+*.jpeg
+*.gif
+*.sh
+*.ps1
+debug
