@@ -23,7 +23,7 @@ archives:
         format: zip
     files: 
       - index.html
-      - static/**/*
+      - static/*
       - NotoColorEmoji
   - 
     id: "ClientArchive"
