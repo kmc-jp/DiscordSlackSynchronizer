@@ -98,12 +98,17 @@ func (s *Imager) MakeReactionsImage(channel string, timestamp string) (r io.Read
 	}
 
 	var maxFrame int = 1
+	var nframe int
 
 	// Get Reaction Images
 	for i := range reactions {
 		reactions[i], maxFrame, err = s.resize(reactions[i])
 		if err != nil {
 			log.Println(errors.Wrap(err, "Resize").Error())
+		}
+
+		if nframe > maxFrame {
+			maxFrame = nframe
 		}
 	}
 
